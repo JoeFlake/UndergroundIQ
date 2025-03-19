@@ -1,27 +1,55 @@
-
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { useTicketData } from '@/hooks/useTicketData';
-import { mockDataService } from '@/lib/mockData';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowDown, ArrowUp, Calendar, ExternalLink, Filter, LogOut, MapPin, User } from 'lucide-react';
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { useTicketData } from "@/hooks/useTicketData";
+import { mockDataService } from "@/lib/mockData";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  ArrowDown,
+  ArrowUp,
+  Calendar,
+  ExternalLink,
+  Filter,
+  LogOut,
+  MapPin,
+  User
+} from "lucide-react";
 
 const Index = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const { 
-    loading, 
-    projects, 
-    tickets, 
-    selectedProject, 
-    sortDirection, 
-    filterByProject, 
-    toggleSortDirection 
+  const {
+    loading,
+    projects,
+    tickets,
+    selectedProject,
+    sortDirection,
+    filterByProject,
+    toggleSortDirection
   } = useTicketData();
 
   // Function to handle ticket click
@@ -31,20 +59,20 @@ const Index = () => {
 
   // Function to format date
   const formatDate = (dateString: string) => {
-    const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' };
+    const options: Intl.DateTimeFormatOptions = { year: "numeric", month: "short", day: "numeric" };
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
 
   // Function to get project name
   const getProjectName = (projectId: string) => {
     const project = mockDataService.getProjectById(projectId);
-    return project ? project.name : 'Unknown Project';
+    return project ? project.name : "Unknown Project";
   };
 
   // Function to get project status
   const getProjectStatus = (projectId: string) => {
     const project = mockDataService.getProjectById(projectId);
-    return project ? project.status : 'Unknown';
+    return project ? project.status : "Unknown";
   };
 
   return (
@@ -54,20 +82,14 @@ const Index = () => {
           <div className="flex justify-between items-center">
             <div>
               <CardTitle className="text-2xl">Your Dashboard</CardTitle>
-              <CardDescription>
-                Welcome back, here are your current tickets
-              </CardDescription>
+              <CardDescription>Welcome back, here are your current tickets</CardDescription>
             </div>
             <div className="flex items-center">
               <div className="flex items-center mr-4 bg-gray-100 p-2 rounded-lg">
                 <User className="h-5 w-5 text-blue-500 mr-2" />
                 <span className="text-sm font-medium">{user?.email}</span>
               </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={signOut}
-              >
+              <Button variant="outline" size="sm" onClick={signOut}>
                 <LogOut className="mr-2 h-4 w-4" />
                 Sign out
               </Button>
@@ -88,14 +110,14 @@ const Index = () => {
                 <div className="flex items-center">
                   <Filter className="mr-2 h-4 w-4 text-gray-500" />
                   <Select
-                    value={selectedProject || ''}
-                    onValueChange={(value) => filterByProject(value || null)}
+                    value={selectedProject || "all"}
+                    onValueChange={(value) => filterByProject(value)}
                   >
                     <SelectTrigger className="w-[200px]">
                       <SelectValue placeholder="Filter by project" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Projects</SelectItem>
+                      <SelectItem value="all">All Projects</SelectItem>
                       {projects.map((project) => (
                         <SelectItem key={project.id} value={project.id}>
                           {project.name}
@@ -104,14 +126,14 @@ const Index = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={toggleSortDirection}
                   className="flex items-center"
                 >
                   <span className="mr-2">Sort by date</span>
-                  {sortDirection === 'asc' ? (
+                  {sortDirection === "asc" ? (
                     <ArrowUp className="h-4 w-4" />
                   ) : (
                     <ArrowDown className="h-4 w-4" />
@@ -140,19 +162,21 @@ const Index = () => {
                       </TableRow>
                     ) : (
                       tickets.map((ticket) => (
-                        <TableRow 
-                          key={ticket.id} 
+                        <TableRow
+                          key={ticket.id}
                           className="cursor-pointer hover:bg-gray-50"
                           onClick={() => handleTicketClick(ticket.id)}
                         >
                           <TableCell className="font-medium">{ticket.number}</TableCell>
                           <TableCell>{getProjectName(ticket.projectId)}</TableCell>
                           <TableCell>
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              getProjectStatus(ticket.projectId) === 'Active' 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-gray-100 text-gray-800'
-                            }`}>
+                            <span
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                getProjectStatus(ticket.projectId) === "Active"
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-gray-100 text-gray-800"
+                              }`}
+                            >
                               {getProjectStatus(ticket.projectId)}
                             </span>
                           </TableCell>
@@ -166,9 +190,9 @@ const Index = () => {
                             {ticket.description}
                           </TableCell>
                           <TableCell className="hidden md:table-cell">
-                            <a 
-                              href={ticket.mapUrl} 
-                              target="_blank" 
+                            <a
+                              href={ticket.mapUrl}
+                              target="_blank"
                               rel="noopener noreferrer"
                               className="text-blue-500 hover:text-blue-700 inline-flex items-center"
                               onClick={(e) => e.stopPropagation()}
@@ -178,8 +202,8 @@ const Index = () => {
                             </a>
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button 
-                              variant="ghost" 
+                            <Button
+                              variant="ghost"
                               size="sm"
                               className="inline-flex items-center px-2 py-1"
                             >
