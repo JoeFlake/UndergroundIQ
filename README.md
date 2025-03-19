@@ -1,69 +1,138 @@
-# Welcome to your Lovable project
+# UndergroundIQ
 
-## Project info
+Insert description here
 
-**URL**: https://lovable.dev/projects/45b48acc-3b8d-4c9d-91d3-4470e8215d09
+## Features
 
-## How can I edit this code?
+- 🔐 Secure authentication with Supabase
+- 🎨 Modern, responsive UI with Tailwind CSS
+- 📱 Mobile-friendly design
+- 🔄 Automatic session persistence
+- 🛡️ Protected routes
+- 🎯 Project and ticket management system
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+- React 18
+- TypeScript
+- Vite
+- Tailwind CSS
+- Supabase
+- React Router
+- Shadcn UI Components
+- Lucide Icons
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/45b48acc-3b8d-4c9d-91d3-4470e8215d09) and start prompting.
+## Prerequisites
 
-Changes made via Lovable will be committed automatically to this repo.
+- Node.js (v16 or higher)
+- npm or yarn
+- Supabase account and project
 
-**Use your preferred IDE**
+## Environment Variables
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+Create a `.env` file in the root directory with the following variables:
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```env
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-**Edit a file directly in GitHub**
+## Installation
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+1. Clone the repository:
 
-**Use GitHub Codespaces**
+```bash
+git clone <repository-url>
+cd UndergroundIQ
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+2. Install dependencies:
 
-## What technologies are used for this project?
+```bash
+npm install
+# or
+yarn install
+```
 
-This project is built with .
+3. Start the development server:
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+```bash
+npm run dev
+# or
+yarn dev
+```
 
-## How can I deploy this project?
+## Database Schema
 
-Simply open [Lovable](https://lovable.dev/projects/45b48acc-3b8d-4c9d-91d3-4470e8215d09) and click on Share -> Publish.
+The application uses the following Supabase tables:
 
-## I want to use a custom domain - is that possible?
+### Projects
 
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+- `id` (bigint, primary key)
+- `name` (text)
+- `created_at` (timestamp with time zone)
+- `updated_at` (timestamp with time zone)
+
+### Tickets
+
+- `id` (bigint, primary key)
+- `project_id` (bigint, foreign key)
+- `description` (text)
+- `expiration_date` (date)
+- `map_url` (text)
+- `created_at` (timestamp with time zone)
+- `updated_at` (timestamp with time zone)
+
+### Users-Projects (Junction Table)
+
+- `user_id` (uuid, references auth.users)
+- `project_id` (bigint, references projects)
+
+## Features in Detail
+
+### Authentication
+
+- Email/password sign-up and sign-in
+- Automatic session persistence
+- Protected routes
+- Automatic redirection based on auth state
+
+### Project Management
+
+- View all projects associated with the user
+- Create and manage tickets within projects
+- Interactive map integration for ticket locations
+- Real-time updates using Supabase
+
+### Security
+
+- Row Level Security (RLS) policies implemented
+- Secure session management
+- Protected API endpoints
+- Environment variable protection
+
+## Development
+
+### Project Structure
+
+```
+UndergroundIQ/
+├── src/
+│   ├── components/     # Reusable UI components
+│   ├── contexts/       # React contexts (Auth, etc.)
+│   ├── hooks/         # Custom React hooks
+│   ├── lib/           # Utility functions and services
+│   ├── pages/         # Page components
+│   ├── types/         # TypeScript type definitions
+│   └── App.tsx        # Main application component
+├── public/            # Static assets
+└── index.html         # Entry HTML file
+```
+
+### Available Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
+- `npm run lint` - Run ESLint
+- `npm run type-check` - Run TypeScript type checking
