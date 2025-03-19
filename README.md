@@ -174,3 +174,11 @@ UndergroundIQ/
 - `npm run preview` - Preview production build
 - `npm run lint` - Run ESLint
 - `npm run type-check` - Run TypeScript type checking
+
+## Acknowledgments
+
+This project was developed with the assistance of:
+
+- [Lovable](https://lovable.dev) - For initial project setup and structure
+- [Cursor](https://cursor.sh) - For intelligent code completion and refactoring
+- [ChatGPT](https://openai.com/chatgpt) - For code suggestions and problem-solving assistance
