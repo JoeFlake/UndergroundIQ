@@ -1,10 +1,6 @@
 
-import { useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-
-// This should match the flag in AuthContext.tsx
-const BYPASS_AUTH = true;
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -13,13 +9,6 @@ interface ProtectedRouteProps {
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const { user, loading } = useAuth();
   const location = useLocation();
-
-  // When bypass is enabled and no user exists, log the bypass
-  useEffect(() => {
-    if (BYPASS_AUTH && !user) {
-      console.log('Auth bypass enabled - protected route accessible without login');
-    }
-  }, [user]);
 
   if (loading) {
     return (
@@ -32,8 +21,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     );
   }
 
-  // When bypass is enabled, allow access even without a user
-  if (!user && !BYPASS_AUTH) {
+  if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 

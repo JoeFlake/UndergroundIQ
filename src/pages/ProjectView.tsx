@@ -1,69 +1,47 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { mockDataService } from '@/lib/mockData';
-import { Project, Ticket } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ArrowLeft, Calendar, ExternalLink, FileText, MapPin, Ticket } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { mockDataService } from '@/lib/mockData';
+import { Ticket } from '@/types';
+import { ArrowLeft, Calendar, ExternalLink, MapPin } from 'lucide-react';
 
 const ProjectView = () => {
-  const { ticketId } = useParams<{ ticketId: string }>();
+  const { ticketId } = useParams();
   const navigate = useNavigate();
+  const [currentTicket, setCurrentTicket] = useState<Ticket | null>(null);
+  const [relatedTickets, setRelatedTickets] = useState<Ticket[]>([]);
+  const [projectName, setProjectName] = useState('');
   const [loading, setLoading] = useState(true);
-  const [ticket, setTicket] = useState<Ticket | null>(null);
-  const [project, setProject] = useState<Project | null>(null);
-  const [previousTickets, setPreviousTickets] = useState<Ticket[]>([]);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchData = async () => {
+    if (ticketId) {
       setLoading(true);
       
-      try {
-        if (!ticketId) {
-          setError('Ticket ID is missing');
-          setLoading(false);
-          return;
-        }
+      // Get the current ticket
+      const ticket = mockDataService.getTicketById(ticketId);
+      
+      if (ticket) {
+        setCurrentTicket(ticket);
         
-        // Get the ticket
-        const foundTicket = mockDataService.getTicketById(ticketId);
+        // Get the project name
+        const project = mockDataService.getProjectById(ticket.projectId);
+        setProjectName(project?.name || 'Unknown Project');
         
-        if (!foundTicket) {
-          setError('Ticket not found');
-          setLoading(false);
-          return;
-        }
-        
-        setTicket(foundTicket);
-        
-        // Get the project
-        const foundProject = mockDataService.getProjectById(foundTicket.projectId);
-        
-        if (foundProject) {
-          setProject(foundProject);
-          
-          // Get all tickets for this project excluding the current one
-          const projectTickets = mockDataService.getTicketsByProjectId(foundProject.id)
-            .filter(t => t.id !== ticketId)
-            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-          
-          setPreviousTickets(projectTickets);
-        }
-      } catch (err) {
-        setError('Failed to load project details');
-        console.error(err);
-      } finally {
-        setLoading(false);
+        // Get related tickets (all tickets from the same project, excluding the current one)
+        const projectTickets = mockDataService.getTicketsByProjectId(ticket.projectId)
+          .filter(t => t.id !== ticketId);
+        setRelatedTickets(projectTickets);
       }
-    };
-    
-    fetchData();
+      
+      setLoading(false);
+    }
   }, [ticketId]);
+
+  const handleBack = () => {
+    navigate('/');
+  };
 
   // Function to format date
   const formatDate = (dateString: string) => {
@@ -73,160 +51,130 @@ const ProjectView = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex justify-center p-4">
-        <Card className="w-full max-w-3xl animate-pulse">
-          <CardHeader>
-            <Skeleton className="h-8 w-3/4 mb-2" />
-            <Skeleton className="h-4 w-1/2" />
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Skeleton className="h-20 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </CardContent>
-        </Card>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="h-12 w-12 rounded-full bg-blue-200"></div>
+          <div className="mt-4 h-4 w-24 bg-blue-200 rounded"></div>
+        </div>
       </div>
     );
   }
 
-  if (error || !ticket || !project) {
+  if (!currentTicket) {
     return (
-      <div className="min-h-screen bg-gray-50 flex justify-center p-4">
-        <Card className="w-full max-w-3xl">
+      <div className="min-h-screen flex items-center justify-center">
+        <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle>Error</CardTitle>
+            <CardTitle className="text-center text-red-500">Ticket Not Found</CardTitle>
           </CardHeader>
-          <CardContent>
-            <Alert variant="destructive">
-              <AlertTitle>Something went wrong</AlertTitle>
-              <AlertDescription>
-                {error || 'Could not load project details'}
-              </AlertDescription>
-            </Alert>
-          </CardContent>
-          <CardFooter>
-            <Button onClick={() => navigate('/')}>
+          <CardContent className="text-center">
+            <p className="mb-4">The ticket you're looking for doesn't exist or has been removed.</p>
+            <Button onClick={handleBack}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Dashboard
             </Button>
-          </CardFooter>
+          </CardContent>
         </Card>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex justify-center p-4">
-      <Card className="w-full max-w-3xl animate-fade-in">
-        <CardHeader>
-          <div className="flex items-start justify-between">
-            <div>
-              <CardTitle className="text-2xl">{project.name}</CardTitle>
-              <CardDescription>
-                Project ID: {project.id}
-              </CardDescription>
-            </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => navigate('/')}
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Current Ticket Details */}
-          <div className="p-4 bg-gray-50 rounded-lg border">
-            <div className="flex items-center mb-4">
-              <Ticket className="h-5 w-5 text-blue-500 mr-2" />
-              <h3 className="text-lg font-medium">Current Ticket: {ticket.number}</h3>
-            </div>
-            
-            <div className="space-y-3">
-              <div className="flex items-start">
-                <Calendar className="h-5 w-5 text-gray-500 mr-2 mt-0.5" />
-                <div>
-                  <p className="text-sm text-gray-500">Expiration Date</p>
-                  <p className="font-medium">{formatDate(ticket.expirationDate)}</p>
-                </div>
+    <div className="min-h-screen bg-gray-50 p-4">
+      <div className="max-w-6xl mx-auto">
+        <Button 
+          variant="ghost" 
+          onClick={handleBack} 
+          className="mb-4"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Dashboard
+        </Button>
+        
+        <Card className="mb-8 animate-fade-in">
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Project</p>
+                <CardTitle className="text-2xl">{projectName}</CardTitle>
               </div>
-              
-              <div className="flex items-start">
-                <FileText className="h-5 w-5 text-gray-500 mr-2 mt-0.5" />
-                <div>
-                  <p className="text-sm text-gray-500">Description</p>
-                  <p className="font-medium">{ticket.description}</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start">
-                <MapPin className="h-5 w-5 text-gray-500 mr-2 mt-0.5" />
-                <div>
-                  <p className="text-sm text-gray-500">Map Location</p>
-                  <a 
-                    href={ticket.mapUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-500 hover:text-blue-700 font-medium inline-flex items-center"
-                  >
-                    View on Map
-                    <ExternalLink className="ml-1 h-4 w-4" />
-                  </a>
-                </div>
+              <div className="text-right">
+                <p className="text-sm text-gray-500 mb-1">Ticket Number</p>
+                <p className="text-xl font-semibold">{currentTicket.number}</p>
               </div>
             </div>
-          </div>
-          
-          {/* Previous Tickets Table */}
-          <div>
-            <h3 className="text-lg font-medium mb-3">Previous Tickets</h3>
-            
-            {previousTickets.length === 0 ? (
-              <p className="text-gray-500 text-center py-4">No previous tickets found</p>
-            ) : (
-              <div className="rounded-md border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Ticket #</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead className="hidden md:table-cell">Description</TableHead>
-                      <TableHead className="text-right">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {previousTickets.map((prevTicket) => (
-                      <TableRow 
-                        key={prevTicket.id} 
-                        className="cursor-pointer hover:bg-gray-50"
-                        onClick={() => navigate(`/project/${prevTicket.id}`)}
-                      >
-                        <TableCell className="font-medium">{prevTicket.number}</TableCell>
-                        <TableCell>{formatDate(prevTicket.expirationDate)}</TableCell>
-                        <TableCell className="hidden md:table-cell max-w-[300px] truncate">
-                          {prevTicket.description}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            className="inline-flex items-center px-2 py-1"
-                          >
-                            <span className="mr-1">View</span>
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 gap-8">
+              <div>
+                <h3 className="text-lg font-medium mb-2">Ticket Details</h3>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-gray-500">Description</p>
+                    <p className="font-medium">{currentTicket.description}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Expiration Date</p>
+                    <div className="flex items-center">
+                      <Calendar className="mr-2 h-4 w-4 text-blue-500" />
+                      <p className="font-medium">{formatDate(currentTicket.expirationDate)}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Project ID</p>
+                    <p className="font-medium">{currentTicket.projectId}</p>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-lg font-medium mb-2">Location</h3>
+                <a 
+                  href={currentTicket.mapUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="flex items-center text-blue-500 hover:text-blue-700 mb-4"
+                >
+                  <MapPin className="mr-2 h-5 w-5" />
+                  <span className="font-medium">View on Map</span>
+                  <ExternalLink className="ml-1 h-4 w-4" />
+                </a>
+                <div className="relative h-60 bg-gray-100 rounded-lg overflow-hidden">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <MapPin className="h-12 w-12 text-gray-300" />
+                    <p className="text-gray-500 text-center absolute top-1/2 left-0 right-0 mt-6">
+                      Interactive map preview would go here
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+                
+            {relatedTickets.length > 0 && (
+              <div className="mt-8">
+                <h3 className="text-lg font-medium mb-4">Other Tickets for this Project</h3>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {relatedTickets.map((ticket) => (
+                    <Card 
+                      key={ticket.id} 
+                      className="cursor-pointer hover:shadow-md transition-shadow"
+                      onClick={() => navigate(`/project/${ticket.id}`)}
+                    >
+                      <CardContent className="pt-6">
+                        <p className="font-semibold">{ticket.number}</p>
+                        <p className="text-sm text-gray-500 line-clamp-2 mt-1">{ticket.description}</p>
+                        <div className="flex items-center mt-2 text-xs text-gray-500">
+                          <Calendar className="mr-1 h-3 w-3" />
+                          {formatDate(ticket.expirationDate)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
               </div>
             )}
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
