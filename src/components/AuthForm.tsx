@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface AuthFormProps {
   type: 'login' | 'signup';
@@ -18,6 +19,7 @@ const AuthForm = ({ type }: AuthFormProps) => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const { signIn, signUp } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -25,6 +27,7 @@ const AuthForm = ({ type }: AuthFormProps) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setFormError(null);
 
     try {
       if (type === 'login') {
@@ -36,8 +39,9 @@ const AuthForm = ({ type }: AuthFormProps) => {
         });
         navigate('/');
       } else {
-        const { error } = await signUp(email, password);
+        const { error, user } = await signUp(email, password);
         if (error) throw error;
+        
         toast({
           title: "Account created!",
           description: "Your account has been created and you're now logged in.",
@@ -45,6 +49,8 @@ const AuthForm = ({ type }: AuthFormProps) => {
         navigate('/');
       }
     } catch (error: any) {
+      console.error('Auth error:', error);
+      setFormError(error.message || "An unexpected error occurred");
       toast({
         variant: "destructive",
         title: "Error",
@@ -74,6 +80,13 @@ const AuthForm = ({ type }: AuthFormProps) => {
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
+          {formError && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4 mr-2" />
+              <AlertDescription>{formError}</AlertDescription>
+            </Alert>
+          )}
+          
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -86,6 +99,7 @@ const AuthForm = ({ type }: AuthFormProps) => {
               className="transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
+          
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
             <div className="relative">
@@ -111,6 +125,7 @@ const AuthForm = ({ type }: AuthFormProps) => {
             </div>
           </div>
         </CardContent>
+        
         <CardFooter className="flex flex-col">
           <Button
             type="submit"
@@ -128,6 +143,7 @@ const AuthForm = ({ type }: AuthFormProps) => {
               'Create account'
             )}
           </Button>
+          
           <div className="mt-4 text-center text-sm">
             {type === 'login' ? (
               <p>

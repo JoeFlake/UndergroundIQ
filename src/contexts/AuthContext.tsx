@@ -47,8 +47,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signUp = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    return { error, user: data.user };
+    try {
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      
+      // Check for specific error types
+      if (error?.message?.includes('already registered')) {
+        return { 
+          error: { 
+            message: 'This email is already registered. Please sign in instead.' 
+          }, 
+          user: null 
+        };
+      }
+      
+      return { error, user: data.user };
+    } catch (error: any) {
+      console.error('Sign up error:', error);
+      return { 
+        error: { message: error.message || 'An error occurred during sign up' }, 
+        user: null 
+      };
+    }
   };
 
   const signOut = async () => {
