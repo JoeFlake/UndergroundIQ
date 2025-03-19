@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
+import ProjectView from "./pages/ProjectView";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +27,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Index />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/project/:ticketId" 
+              element={
+                <ProtectedRoute>
+                  <ProjectView />
                 </ProtectedRoute>
               } 
             />
