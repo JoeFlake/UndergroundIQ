@@ -37,6 +37,8 @@ VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
+> **Note**: The Supabase anon key is safe to use in the frontend as it has limited permissions. Never use the service role key in the frontend.
+
 ## Installation
 
 1. Clone the repository:
@@ -60,6 +62,42 @@ yarn install
 npm run dev
 # or
 yarn dev
+```
+
+## Deployment
+
+### GitHub Pages
+
+This project is configured for deployment to GitHub Pages. To deploy:
+
+1. Push your code to GitHub
+2. Set up environment variables in GitHub:
+   - Go to your repository settings
+   - Navigate to "Secrets and variables" → "Actions"
+   - Add two secrets:
+     - `VITE_SUPABASE_URL`: Your Supabase project URL
+     - `VITE_SUPABASE_ANON_KEY`: Your Supabase anon/public key
+3. Go to "Pages" in the sidebar
+4. Under "Source", select "GitHub Actions"
+5. The site will be automatically deployed when you push to the main branch
+
+Your site will be available at: `https://<your-github-username>.github.io/UndergroundIQ/`
+
+> **Security Note**: The environment variables are only available during the build process and are never exposed in the deployed code. The Supabase anon key is designed to be public and has limited permissions. Your Row Level Security (RLS) policies will still protect your data.
+
+### Local Development
+
+For local development:
+
+```bash
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
 ```
 
 ## Database Schema
