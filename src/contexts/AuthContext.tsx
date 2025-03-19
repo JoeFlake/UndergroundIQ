@@ -97,6 +97,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             user: null
           };
         }
+        if (error.message.includes("invalid")) {
+          return {
+            error: { message: "Please enter a valid email address" },
+            user: null
+          };
+        }
         return { error: { message: error.message }, user: null };
       }
 
@@ -120,7 +126,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
       }
 
-      return { error: null, user: data.user };
+      // Automatically sign in after successful signup
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (signInError) {
+        console.error("Auto sign-in error:", signInError);
+        return {
+          error: { message: "Account created but failed to sign in automatically" },
+          user: null
+        };
+      }
+
+      return { error: null, user: signInData.user };
     } catch (error: Error | unknown) {
       console.error("Sign up error:", error);
       return {

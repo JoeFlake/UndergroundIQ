@@ -1,72 +1,66 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "@/hooks/useAuth";
-import { mockDataService } from "@/lib/mockData";
-import { Project, Ticket } from "@/types";
+import { supabaseService } from "@/lib/supabaseService";
+import type { Project, Ticket } from "@/types";
 
-export function useTicketData() {
-  const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
+export const useTicketData = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [filteredTickets, setFilteredTickets] = useState<Ticket[]>([]);
-  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>("");
+  const [selectedProject, setSelectedProject] = useState<string>("all");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
-  // Fetch initial data
   useEffect(() => {
-    if (user) {
-      setLoading(true);
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError("");
 
-      // Get projects for user
-      const userProjects = mockDataService.getUserProjects(user.id);
-      setProjects(userProjects);
+        // Fetch projects and tickets
+        const projectsData = await supabaseService.getUserProjects();
+        const ticketsData = await supabaseService.getUserTickets();
 
-      // Get tickets for all user projects
-      const projectIds = userProjects.map((p) => p.id);
-      const userTickets = mockDataService.getProjectTickets(projectIds);
-      setTickets(userTickets);
-      setFilteredTickets(userTickets);
+        setProjects(projectsData);
+        setTickets(ticketsData);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to fetch data");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      setLoading(false);
-    }
-  }, [user]);
+    fetchData();
+  }, []);
 
-  // Apply filters and sorting
-  useEffect(() => {
-    let result = [...tickets];
-
-    // Apply project filter
-    if (selectedProject) {
-      result = result.filter((ticket) => ticket.projectId === selectedProject);
-    }
-
-    // Apply sorting
-    result.sort((a, b) => {
-      const dateA = new Date(a.expirationDate).getTime();
-      const dateB = new Date(b.expirationDate).getTime();
-      return sortDirection === "asc" ? dateA - dateB : dateB - dateA;
-    });
-
-    setFilteredTickets(result);
-  }, [tickets, selectedProject, sortDirection]);
-
-  // Function to filter by project
-  const filterByProject = (projectId: string | null) => {
-    setSelectedProject(projectId === "all" ? null : projectId);
+  // Filter tickets by project
+  const filterByProject = (projectId: string) => {
+    setSelectedProject(projectId);
   };
 
-  // Function to toggle sort direction
+  // Toggle sort direction
   const toggleSortDirection = () => {
     setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
   };
 
+  // Filter and sort tickets based on current state
+  const filteredAndSortedTickets = tickets
+    .filter(
+      (ticket) => selectedProject === "all" || ticket.project_id.toString() === selectedProject
+    )
+    .sort((a, b) => {
+      const dateA = new Date(a.expiration_date).getTime();
+      const dateB = new Date(b.expiration_date).getTime();
+      return sortDirection === "asc" ? dateA - dateB : dateB - dateA;
+    });
+
   return {
-    loading,
     projects,
-    tickets: filteredTickets,
+    tickets: filteredAndSortedTickets,
+    loading,
+    error,
     selectedProject,
     sortDirection,
     filterByProject,
     toggleSortDirection
   };
-}
+};

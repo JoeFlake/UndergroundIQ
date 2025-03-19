@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { mockDataService } from "@/lib/mockData";
-import { Ticket } from "@/types";
+import { supabaseService } from "@/lib/supabaseService";
+import { Ticket, Project } from "@/types";
 import { ArrowLeft, Calendar, ExternalLink, MapPin } from "lucide-react";
 
 const ProjectView = () => {
@@ -15,28 +15,35 @@ const ProjectView = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (ticketId) {
-      setLoading(true);
+    const fetchTicketData = async () => {
+      if (!ticketId) return;
 
-      // Get the current ticket
-      const ticket = mockDataService.getTicketById(ticketId);
+      try {
+        setLoading(true);
+        const ticketIdNum = parseInt(ticketId, 10);
 
-      if (ticket) {
-        setCurrentTicket(ticket);
+        // Get the current ticket
+        const ticket = await supabaseService.getTicketById(ticketIdNum);
 
-        // Get the project name
-        const project = mockDataService.getProjectById(ticket.projectId);
-        setProjectName(project?.name || "Unknown Project");
+        if (ticket) {
+          setCurrentTicket(ticket);
 
-        // Get related tickets (all tickets from the same project, excluding the current one)
-        const projectTickets = mockDataService
-          .getTicketsByProjectId(ticket.projectId)
-          .filter((t) => t.id !== ticketId);
-        setRelatedTickets(projectTickets);
+          // Get the project name
+          const project = await supabaseService.getProjectById(ticket.project_id);
+          setProjectName(project?.project_name || "Unknown Project");
+
+          // Get related tickets (all tickets from the same project, excluding the current one)
+          const projectTickets = await supabaseService.getTicketsByProjectId(ticket.project_id);
+          setRelatedTickets(projectTickets.filter((t) => t.ticket_id !== ticketIdNum));
+        }
+      } catch (error) {
+        console.error("Error fetching ticket data:", error);
+      } finally {
+        setLoading(false);
       }
+    };
 
-      setLoading(false);
-    }
+    fetchTicketData();
   }, [ticketId]);
 
   const handleBack = () => {
@@ -101,7 +108,7 @@ const ProjectView = () => {
               </div>
               <div className="text-right">
                 <p className="text-sm text-gray-500 mb-1">Ticket Number</p>
-                <p className="text-xl font-semibold">{currentTicket.number}</p>
+                <p className="text-xl font-semibold">{currentTicket.ticket_number}</p>
               </div>
             </div>
           </CardHeader>
@@ -118,19 +125,19 @@ const ProjectView = () => {
                     <p className="text-sm text-gray-500">Expiration Date</p>
                     <div className="flex items-center">
                       <Calendar className="mr-2 h-4 w-4 text-blue-500" />
-                      <p className="font-medium">{formatDate(currentTicket.expirationDate)}</p>
+                      <p className="font-medium">{formatDate(currentTicket.expiration_date)}</p>
                     </div>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Project ID</p>
-                    <p className="font-medium">{currentTicket.projectId}</p>
+                    <p className="font-medium">{currentTicket.project_id}</p>
                   </div>
                 </div>
               </div>
               <div>
                 <h3 className="text-lg font-medium mb-2">Location</h3>
                 <a
-                  href={currentTicket.mapUrl}
+                  href={currentTicket.map_url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center text-blue-500 hover:text-blue-700 mb-4"
@@ -156,18 +163,18 @@ const ProjectView = () => {
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {relatedTickets.map((ticket) => (
                     <Card
-                      key={ticket.id}
+                      key={ticket.ticket_id}
                       className="cursor-pointer hover:shadow-md transition-shadow"
-                      onClick={() => navigate(`/project/${ticket.id}`)}
+                      onClick={() => navigate(`/project/${ticket.ticket_id}`)}
                     >
                       <CardContent className="pt-6">
-                        <p className="font-semibold">{ticket.number}</p>
+                        <p className="font-semibold">{ticket.ticket_number}</p>
                         <p className="text-sm text-gray-500 line-clamp-2 mt-1">
                           {ticket.description}
                         </p>
                         <div className="flex items-center mt-2 text-xs text-gray-500">
                           <Calendar className="mr-1 h-3 w-3" />
-                          {formatDate(ticket.expirationDate)}
+                          {formatDate(ticket.expiration_date)}
                         </div>
                       </CardContent>
                     </Card>

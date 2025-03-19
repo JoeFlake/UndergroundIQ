@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useTicketData } from "@/hooks/useTicketData";
-import { mockDataService } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -53,7 +52,7 @@ const Index = () => {
   } = useTicketData();
 
   // Function to handle ticket click
-  const handleTicketClick = (ticketId: string) => {
+  const handleTicketClick = (ticketId: number) => {
     navigate(`/project/${ticketId}`);
   };
 
@@ -64,15 +63,18 @@ const Index = () => {
   };
 
   // Function to get project name
-  const getProjectName = (projectId: string) => {
-    const project = mockDataService.getProjectById(projectId);
-    return project ? project.name : "Unknown Project";
+  const getProjectName = (projectId: number) => {
+    const project = projects.find((p) => p.project_id === projectId);
+    return project ? project.project_name : "Unknown Project";
   };
 
-  // Function to get project status
-  const getProjectStatus = (projectId: string) => {
-    const project = mockDataService.getProjectById(projectId);
-    return project ? project.status : "Unknown";
+  // Function to get project status (using expiration date as a simple status indicator)
+  const getProjectStatus = (projectId: number) => {
+    const projectTickets = tickets.filter((t) => t.project_id === projectId);
+    if (projectTickets.length === 0) return "No Tickets";
+
+    const hasExpiredTickets = projectTickets.some((t) => new Date(t.expiration_date) < new Date());
+    return hasExpiredTickets ? "Expired" : "Active";
   };
 
   return (
@@ -119,8 +121,8 @@ const Index = () => {
                     <SelectContent>
                       <SelectItem value="all">All Projects</SelectItem>
                       {projects.map((project) => (
-                        <SelectItem key={project.id} value={project.id}>
-                          {project.name}
+                        <SelectItem key={project.project_id} value={project.project_id.toString()}>
+                          {project.project_name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -163,27 +165,29 @@ const Index = () => {
                     ) : (
                       tickets.map((ticket) => (
                         <TableRow
-                          key={ticket.id}
+                          key={ticket.ticket_id}
                           className="cursor-pointer hover:bg-gray-50"
-                          onClick={() => handleTicketClick(ticket.id)}
+                          onClick={() => handleTicketClick(ticket.ticket_id)}
                         >
-                          <TableCell className="font-medium">{ticket.number}</TableCell>
-                          <TableCell>{getProjectName(ticket.projectId)}</TableCell>
+                          <TableCell className="font-medium">{ticket.ticket_number}</TableCell>
+                          <TableCell>{getProjectName(ticket.project_id)}</TableCell>
                           <TableCell>
                             <span
                               className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                getProjectStatus(ticket.projectId) === "Active"
+                                getProjectStatus(ticket.project_id) === "Active"
                                   ? "bg-green-100 text-green-800"
+                                  : getProjectStatus(ticket.project_id) === "Expired"
+                                  ? "bg-red-100 text-red-800"
                                   : "bg-gray-100 text-gray-800"
                               }`}
                             >
-                              {getProjectStatus(ticket.projectId)}
+                              {getProjectStatus(ticket.project_id)}
                             </span>
                           </TableCell>
                           <TableCell className="whitespace-nowrap">
                             <div className="flex items-center">
                               <Calendar className="mr-2 h-4 w-4 text-gray-500" />
-                              {formatDate(ticket.expirationDate)}
+                              {formatDate(ticket.expiration_date)}
                             </div>
                           </TableCell>
                           <TableCell className="hidden md:table-cell max-w-[200px] truncate">
@@ -191,7 +195,7 @@ const Index = () => {
                           </TableCell>
                           <TableCell className="hidden md:table-cell">
                             <a
-                              href={ticket.mapUrl}
+                              href={ticket.map_url}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-blue-500 hover:text-blue-700 inline-flex items-center"

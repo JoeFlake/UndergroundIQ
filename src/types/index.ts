@@ -1,17 +1,22 @@
-
 export interface Project {
-  id: string;
-  name: string;
-  status: 'Active' | 'Inactive';
-  userId: string;
+  project_id: number;
+  project_name: string;
 }
 
 export interface Ticket {
-  id: string;
-  number: string;
-  projectId: string;
-  expirationDate: string;
+  ticket_id: number;
+  ticket_number: string;
+  project_id: number;
   description: string;
-  mapUrl: string;
-  createdAt: string;
+  expiration_date: string;
+  legal_date: string;
+  update_date: string;
+  map_url: string;
+  full_ticket: string;
+  old_ticket_numbers: string[];
+}
+
+export interface UserProject {
+  user_id: string; // UUID from Supabase auth
+  project_id: number;
 }
