@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UndergroundIQ</title>
+    <script>
+      // Single Page Apps for GitHub Pages
+      // MIT License
+      // https://github.com/rafgraph/spa-github-pages
+      var pathSegmentsToKeep = 1;
+      var l = window.location;
+      var r = l.pathname.split("/").slice(1);
+      var s = r.slice(0, pathSegmentsToKeep).join("/") + "/";
+      var m = l.pathname.slice(0, l.pathname.length - s.length);
+      var h = l.hash;
+      var u = h ? m + h : m;
+      u = u + (l.search ? l.search : "");
+      l.replace(u);
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
