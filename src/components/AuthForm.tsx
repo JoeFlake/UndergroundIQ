@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Eye, EyeOff, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -154,22 +154,22 @@ const AuthForm = ({ type }: AuthFormProps) => {
             {type === "login" ? (
               <p>
                 Don't have an account?{" "}
-                <a
-                  href="/signup"
+                <Link
+                  to="/signup"
                   className="text-blue-600 hover:text-blue-800 hover:underline transition-colors"
                 >
                   Sign up
-                </a>
+                </Link>
               </p>
             ) : (
               <p>
                 Already have an account?{" "}
-                <a
-                  href="/login"
+                <Link
+                  to="/login"
                   className="text-blue-600 hover:text-blue-800 hover:underline transition-colors"
                 >
                   Sign in
-                </a>
+                </Link>
               </p>
             )}
           </div>
