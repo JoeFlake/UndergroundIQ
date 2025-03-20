@@ -7,11 +7,8 @@ type AuthContextType = {
   session: Session | null;
   user: User | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: { message: string } | null }>;
-  signUp: (
-    email: string,
-    password: string
-  ) => Promise<{ error: { message: string } | null; user: User | null }>;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -19,21 +16,21 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export { AuthContext };
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Initial session fetch
+    // Check active sessions and sets the user
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
-    // Listen for auth changes
+    // Listen for changes on auth state (logged in, signed out, etc.)
     const {
       data: { subscription }
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -42,116 +39,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     });
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
 
-      if (error) {
-        // Handle specific error cases
-        if (error.message.includes("Invalid login credentials")) {
-          return { error: { message: "Invalid email or password" } };
-        }
-        if (error.message.includes("Email not confirmed")) {
-          return { error: { message: "Please verify your email address" } };
-        }
-        return { error: { message: error.message } };
-      }
-
-      return { error: null };
-    } catch (error: Error | unknown) {
-      console.error("Sign in error:", error);
-      return { error: { message: "An unexpected error occurred" } };
-    }
+    if (error) throw error;
+    navigate("/");
   };
 
   const signUp = async (email: string, password: string) => {
-    try {
-      console.log("Attempting sign up for email:", email);
-      const { data, error } = await supabase.auth.signUp({ email, password });
+    const { error } = await supabase.auth.signUp({
+      email,
+      password
+    });
 
-      if (error) {
-        console.log("Sign up error details:", {
-          message: error.message,
-          status: error.status,
-          name: error.name
-        });
-        // Handle specific error cases
-        if (
-          error.message.includes("already registered") ||
-          error.message.includes("already exists") ||
-          error.message.includes("User already registered")
-        ) {
-          return {
-            error: { message: "This email is already registered. Please sign in instead." },
-            user: null
-          };
-        }
-        if (error.message.includes("password")) {
-          return {
-            error: { message: "Password must be at least 6 characters long" },
-            user: null
-          };
-        }
-        if (error.message.includes("invalid")) {
-          return {
-            error: { message: "Please enter a valid email address" },
-            user: null
-          };
-        }
-        return { error: { message: error.message }, user: null };
-      }
-
-      console.log("Sign up response:", { data, error });
-
-      // Check if we got a user back
-      if (!data?.user) {
-        console.log("No user data received from sign up");
-        return {
-          error: { message: "Failed to create account. Please try again." },
-          user: null
-        };
-      }
-
-      // Check if the user is already registered
-      if (data.user.identities && data.user.identities.length === 0) {
-        console.log("User already registered (no new identities created)");
-        return {
-          error: { message: "This email is already registered. Please sign in instead." },
-          user: null
-        };
-      }
-
-      // Automatically sign in after successful signup
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-
-      if (signInError) {
-        console.error("Auto sign-in error:", signInError);
-        return {
-          error: { message: "Account created but failed to sign in automatically" },
-          user: null
-        };
-      }
-
-      return { error: null, user: signInData.user };
-    } catch (error: Error | unknown) {
-      console.error("Sign up error:", error);
-      return {
-        error: { message: "An unexpected error occurred" },
-        user: null
-      };
-    }
+    if (error) throw error;
+    navigate("/login");
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
     navigate("/login");
   };
 
@@ -165,4 +78,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+}
