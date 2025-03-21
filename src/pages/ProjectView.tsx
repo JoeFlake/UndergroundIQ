@@ -13,6 +13,7 @@ const ProjectView = () => {
   const [relatedTickets, setRelatedTickets] = useState<Ticket[]>([]);
   const [projectName, setProjectName] = useState("");
   const [loading, setLoading] = useState(true);
+  const [mapImageUrl, setMapImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchTicketData = async () => {
@@ -45,6 +46,27 @@ const ProjectView = () => {
 
     fetchTicketData();
   }, [ticketId]);
+
+  useEffect(() => {
+    const fetchMapImage = async (url: string) => {
+      try {
+        const response = await fetch(url);
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, "text/html");
+        const mapImage = doc.querySelector("img.mapsize#O") as HTMLImageElement;
+        if (mapImage) {
+          setMapImageUrl(mapImage.src);
+        }
+      } catch (error) {
+        console.error("Error fetching map image:", error);
+      }
+    };
+
+    if (currentTicket?.map_url) {
+      fetchMapImage(currentTicket.map_url);
+    }
+  }, [currentTicket?.map_url]);
 
   const handleBack = () => {
     navigate("/");
@@ -151,13 +173,20 @@ const ProjectView = () => {
                   </a>
                 </div>
                 <div className="relative h-60 bg-gray-100 rounded-lg overflow-hidden">
-                  <iframe
-                    src={currentTicket.map_url}
-                    className="absolute inset-0 w-full h-full"
-                    title="Map Preview"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
+                  {mapImageUrl ? (
+                    <img
+                      src={mapImageUrl}
+                      alt="Map Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <MapPin className="h-12 w-12 text-gray-300" />
+                      <p className="text-gray-500 text-center absolute top-1/2 left-0 right-0 mt-6">
+                        Loading map preview...
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
