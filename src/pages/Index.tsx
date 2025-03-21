@@ -21,7 +21,16 @@ import {
   SelectValue
 } from "../components/ui/select";
 import { Skeleton } from "../components/ui/skeleton";
-import { ArrowDown, ArrowUp, Calendar, ExternalLink, Filter, MapPin, User } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Calendar,
+  ExternalLink,
+  Filter,
+  MapPin,
+  User,
+  CheckCircle
+} from "lucide-react";
 
 export default function Index() {
   const { user } = useAuth();
@@ -32,8 +41,10 @@ export default function Index() {
     tickets,
     selectedProject,
     sortDirection,
+    showActiveOnly,
     filterByProject,
-    toggleSortDirection
+    toggleSortDirection,
+    setShowActiveOnly
   } = useTicketData();
 
   // Function to handle ticket click
@@ -77,24 +88,35 @@ export default function Index() {
         <Card className="w-full max-w-6xl animate-fade-in">
           <CardContent className="pt-6">
             <div className="flex justify-between items-center mb-4">
-              <div className="flex items-center">
-                <Filter className="mr-2 h-4 w-4 text-gray-500" />
-                <Select
-                  value={selectedProject || "all"}
-                  onValueChange={(value) => filterByProject(value)}
+              <div className="flex items-center gap-4">
+                <div className="flex items-center">
+                  <Filter className="mr-2 h-4 w-4 text-gray-500" />
+                  <Select
+                    value={selectedProject || "all"}
+                    onValueChange={(value) => filterByProject(value)}
+                  >
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Filter by project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Projects</SelectItem>
+                      {projects.map((project) => (
+                        <SelectItem key={project.project_id} value={project.project_id.toString()}>
+                          {project.project_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  variant={showActiveOnly ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowActiveOnly(!showActiveOnly)}
+                  className="flex items-center"
                 >
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Filter by project" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Projects</SelectItem>
-                    {projects.map((project) => (
-                      <SelectItem key={project.project_id} value={project.project_id.toString()}>
-                        {project.project_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Active
+                </Button>
               </div>
               <Button
                 variant="ghost"

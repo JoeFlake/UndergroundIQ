@@ -9,6 +9,7 @@ export const useTicketData = () => {
   const [error, setError] = useState<string>("");
   const [selectedProject, setSelectedProject] = useState<string>("all");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [showActiveOnly, setShowActiveOnly] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -44,9 +45,12 @@ export const useTicketData = () => {
 
   // Filter and sort tickets based on current state
   const filteredAndSortedTickets = tickets
-    .filter(
-      (ticket) => selectedProject === "all" || ticket.project_id.toString() === selectedProject
-    )
+    .filter((ticket) => {
+      const projectMatch =
+        selectedProject === "all" || ticket.project_id.toString() === selectedProject;
+      const activeMatch = !showActiveOnly || new Date(ticket.expiration_date) > new Date();
+      return projectMatch && activeMatch;
+    })
     .sort((a, b) => {
       const dateA = new Date(a.expiration_date).getTime();
       const dateB = new Date(b.expiration_date).getTime();
@@ -60,7 +64,9 @@ export const useTicketData = () => {
     error,
     selectedProject,
     sortDirection,
+    showActiveOnly,
     filterByProject,
-    toggleSortDirection
+    toggleSortDirection,
+    setShowActiveOnly
   };
 };
