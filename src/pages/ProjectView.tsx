@@ -21,6 +21,7 @@ const ProjectView = () => {
 
       try {
         setLoading(true);
+        setMapImageUrl(null); // Reset the map image when ticket changes
         const ticketIdNum = parseInt(ticketId, 10);
 
         // Get the current ticket
