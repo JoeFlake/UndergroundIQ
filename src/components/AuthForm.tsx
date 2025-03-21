@@ -64,7 +64,6 @@ const AuthForm = ({ type }: AuthFormProps) => {
         navigate("/");
       }
     } catch (error) {
-      console.error("Auth error:", error);
       setError("An unexpected error occurred");
     } finally {
       setLoading(false);

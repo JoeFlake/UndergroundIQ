@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { Session, User } from "@supabase/supabase-js";
+import { Session, User, AuthError } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { useNavigate } from "react-router-dom";
 
@@ -7,9 +7,12 @@ type AuthContextType = {
   session: Session | null;
   user: User | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
-  signOut: () => Promise<void>;
+  signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  signUp: (
+    email: string,
+    password: string
+  ) => Promise<{ error: AuthError | null; user: User | null }>;
+  signOut: () => Promise<{ error: AuthError | null }>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -48,24 +51,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password
     });
 
-    if (error) throw error;
-    navigate("/");
+    if (!error) {
+      navigate("/");
+    }
+    return { error };
   };
 
   const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { error, data } = await supabase.auth.signUp({
       email,
       password
     });
 
-    if (error) throw error;
-    navigate("/login");
+    if (!error) {
+      navigate("/login");
+    }
+    return { error, user: data.user };
   };
 
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-    navigate("/login");
+    if (!error) {
+      navigate("/login");
+    }
+    return { error };
   };
 
   const value: AuthContextType = {

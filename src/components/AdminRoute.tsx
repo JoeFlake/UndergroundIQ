@@ -21,7 +21,6 @@ export function AdminRoute({ children }: AdminRouteProps) {
       }
 
       try {
-        console.log("Checking admin status for user:", user.id);
         const { data, error } = await supabase
           .from("users_info")
           .select("is_admin")
@@ -34,7 +33,6 @@ export function AdminRoute({ children }: AdminRouteProps) {
           return;
         }
 
-        console.log("Admin status result:", data);
         setIsAdmin(data?.is_admin || false);
       } catch (error) {
         console.error("Error in checkAdminStatus:", error);
@@ -54,7 +52,6 @@ export function AdminRoute({ children }: AdminRouteProps) {
   }
 
   if (!user || !isAdmin) {
-    console.log("User not authenticated or not admin:", { user, isAdmin });
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
