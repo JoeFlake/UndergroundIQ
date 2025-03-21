@@ -138,16 +138,18 @@ const ProjectView = () => {
                 </div>
               </div>
               <div>
-                <h3 className="text-lg font-medium mb-2">Location</h3>
-                <a
-                  href={currentTicket.map_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center text-blue-500 hover:text-blue-700 mb-4"
-                >
-                  <span className="font-medium">View</span>
-                  <ExternalLink className="ml-1 h-4 w-4" />
-                </a>
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="text-lg font-medium">Location</h3>
+                  <a
+                    href={currentTicket.map_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center text-blue-500 hover:text-blue-700"
+                  >
+                    <span className="font-medium">View</span>
+                    <ExternalLink className="ml-1 h-4 w-4" />
+                  </a>
+                </div>
                 <div className="relative h-60 bg-gray-100 rounded-lg overflow-hidden">
                   <iframe
                     src={currentTicket.map_url}
