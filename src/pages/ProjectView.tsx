@@ -129,8 +129,11 @@ const ProjectView = () => {
                     </div>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Project ID</p>
-                    <p className="font-medium">{currentTicket.project_id}</p>
+                    <p className="text-sm text-gray-500">Legal Date</p>
+                    <div className="flex items-center">
+                      <Calendar className="mr-2 h-4 w-4 text-blue-500" />
+                      <p className="font-medium">{formatDate(currentTicket.legal_date)}</p>
+                    </div>
                   </div>
                 </div>
               </div>

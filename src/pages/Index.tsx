@@ -203,7 +203,7 @@ export default function Index() {
                             onClick={(e) => e.stopPropagation()}
                             asChild
                           >
-                            <a href="https://example.com" target="_blank" rel="noopener noreferrer">
+                            <a href={ticket.map_url} target="_blank" rel="noopener noreferrer">
                               <ExternalLink className="h-4 w-4" />
                               <span className="ml-1 md:hidden">View</span>
                             </a>
