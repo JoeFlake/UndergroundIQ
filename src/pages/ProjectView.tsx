@@ -145,17 +145,17 @@ const ProjectView = () => {
                   rel="noopener noreferrer"
                   className="flex items-center text-blue-500 hover:text-blue-700 mb-4"
                 >
-                  <MapPin className="mr-2 h-5 w-5" />
-                  <span className="font-medium">View on Map</span>
+                  <span className="font-medium">View</span>
                   <ExternalLink className="ml-1 h-4 w-4" />
                 </a>
                 <div className="relative h-60 bg-gray-100 rounded-lg overflow-hidden">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <MapPin className="h-12 w-12 text-gray-300" />
-                    <p className="text-gray-500 text-center absolute top-1/2 left-0 right-0 mt-6">
-                      Interactive map preview would go here
-                    </p>
-                  </div>
+                  <iframe
+                    src={currentTicket.map_url}
+                    className="absolute inset-0 w-full h-full"
+                    title="Map Preview"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
                 </div>
               </div>
             </div>
