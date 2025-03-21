@@ -10,6 +10,7 @@ export const useTicketData = () => {
   const [selectedProject, setSelectedProject] = useState<string>("all");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [showActiveOnly, setShowActiveOnly] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -49,7 +50,18 @@ export const useTicketData = () => {
       const projectMatch =
         selectedProject === "all" || ticket.project_id.toString() === selectedProject;
       const activeMatch = !showActiveOnly || new Date(ticket.expiration_date) > new Date();
-      return projectMatch && activeMatch;
+
+      // Search filter
+      const searchMatch =
+        !searchQuery ||
+        ticket.ticket_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        ticket.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        projects
+          .find((p) => p.project_id === ticket.project_id)
+          ?.project_name.toLowerCase()
+          .includes(searchQuery.toLowerCase());
+
+      return projectMatch && activeMatch && searchMatch;
     })
     .sort((a, b) => {
       const dateA = new Date(a.expiration_date).getTime();
@@ -65,8 +77,10 @@ export const useTicketData = () => {
     selectedProject,
     sortDirection,
     showActiveOnly,
+    searchQuery,
     filterByProject,
     toggleSortDirection,
-    setShowActiveOnly
+    setShowActiveOnly,
+    setSearchQuery
   };
 };

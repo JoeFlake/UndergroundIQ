@@ -21,6 +21,7 @@ import {
   SelectValue
 } from "../components/ui/select";
 import { Skeleton } from "../components/ui/skeleton";
+import { Input } from "../components/ui/input";
 import {
   ArrowDown,
   ArrowUp,
@@ -29,7 +30,8 @@ import {
   Filter,
   MapPin,
   User,
-  CheckCircle
+  CheckCircle,
+  Search
 } from "lucide-react";
 
 export default function Index() {
@@ -42,9 +44,11 @@ export default function Index() {
     selectedProject,
     sortDirection,
     showActiveOnly,
+    searchQuery,
     filterByProject,
     toggleSortDirection,
-    setShowActiveOnly
+    setShowActiveOnly,
+    setSearchQuery
   } = useTicketData();
 
   // Function to handle ticket click
@@ -118,6 +122,15 @@ export default function Index() {
                   Active
                 </Button>
               </div>
+              <div className="relative flex-1 max-w-md mx-4">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
+                <Input
+                  placeholder="Search tickets..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8 w-full"
+                />
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
@@ -141,14 +154,13 @@ export default function Index() {
                     <TableHead>Status</TableHead>
                     <TableHead>Expiration</TableHead>
                     <TableHead className="hidden md:table-cell">Description</TableHead>
-                    <TableHead className="hidden md:table-cell">Map</TableHead>
                     <TableHead className="text-right">View</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {tickets.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-6 text-gray-500">
+                      <TableCell colSpan={6} className="text-center py-6 text-gray-500">
                         No tickets found
                       </TableCell>
                     </TableRow>
@@ -183,26 +195,18 @@ export default function Index() {
                         <TableCell className="hidden md:table-cell max-w-[200px] truncate">
                           {ticket.description}
                         </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          <a
-                            href={ticket.map_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-500 hover:text-blue-700 inline-flex items-center"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <MapPin className="h-4 w-4 mr-1" />
-                            View Map
-                          </a>
-                        </TableCell>
                         <TableCell className="text-right">
                           <Button
                             variant="ghost"
                             size="sm"
                             className="inline-flex items-center px-2 py-1"
+                            onClick={(e) => e.stopPropagation()}
+                            asChild
                           >
-                            <ExternalLink className="h-4 w-4" />
-                            <span className="ml-1 md:hidden">View</span>
+                            <a href="https://example.com" target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="h-4 w-4" />
+                              <span className="ml-1 md:hidden">View</span>
+                            </a>
                           </Button>
                         </TableCell>
                       </TableRow>
