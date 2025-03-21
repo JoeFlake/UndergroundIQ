@@ -3,8 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabaseService } from "@/lib/supabaseService";
-import { Ticket, Project } from "@/types";
-import { ArrowLeft, Calendar, ExternalLink, MapPin } from "lucide-react";
+import { Ticket, Project, UserProject } from "@/types";
+import { ArrowLeft, Calendar, ExternalLink, MapPin, Users } from "lucide-react";
 
 const ProjectView = () => {
   const { ticketId } = useParams();
@@ -14,6 +14,7 @@ const ProjectView = () => {
   const [projectName, setProjectName] = useState("");
   const [loading, setLoading] = useState(true);
   const [mapImageUrl, setMapImageUrl] = useState<string | null>(null);
+  const [projectUsers, setProjectUsers] = useState<UserProject[]>([]);
 
   useEffect(() => {
     const fetchTicketData = async () => {
@@ -21,7 +22,7 @@ const ProjectView = () => {
 
       try {
         setLoading(true);
-        setMapImageUrl(null); // Reset the map image when ticket changes
+        setMapImageUrl(null);
         const ticketIdNum = parseInt(ticketId, 10);
 
         // Get the current ticket
@@ -30,11 +31,15 @@ const ProjectView = () => {
         if (ticket) {
           setCurrentTicket(ticket);
 
-          // Get the project name
+          // Get the project name and users
           const project = await supabaseService.getProjectById(ticket.project_id);
           setProjectName(project?.project_name || "Unknown Project");
 
-          // Get related tickets (all tickets from the same project, excluding the current one)
+          // Get project users
+          const users = await supabaseService.getProjectUsers(ticket.project_id);
+          setProjectUsers(users);
+
+          // Get related tickets
           const projectTickets = await supabaseService.getTicketsByProjectId(ticket.project_id);
           setRelatedTickets(projectTickets.filter((t) => t.ticket_id !== ticketIdNum));
         }
@@ -157,6 +162,21 @@ const ProjectView = () => {
                       <Calendar className="mr-2 h-4 w-4 text-blue-500" />
                       <p className="font-medium">{formatDate(currentTicket.legal_date)}</p>
                     </div>
+                  </div>
+                </div>
+                <div className="mt-8">
+                  <h3 className="text-lg font-medium mb-2">Project Users</h3>
+                  <div className="space-y-2">
+                    {projectUsers.length > 0 ? (
+                      projectUsers.map((user) => (
+                        <div key={user.user_id} className="flex items-center text-sm">
+                          <Users className="mr-2 h-4 w-4 text-gray-500" />
+                          <span>{user.email}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500">No users assigned to this project</p>
+                    )}
                   </div>
                 </div>
               </div>

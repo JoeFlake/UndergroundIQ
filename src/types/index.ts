@@ -17,6 +17,6 @@ export interface Ticket {
 }
 
 export interface UserProject {
-  user_id: string; // UUID from Supabase auth
-  project_id: number;
+  user_id: string;
+  email: string;
 }

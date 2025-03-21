@@ -103,5 +103,28 @@ export const supabaseService = {
 
     if (error) throw error;
     return data;
+  },
+
+  // Get users assigned to a project
+  getProjectUsers: async (projectId: number): Promise<UserProject[]> => {
+    const { data, error } = await supabase
+      .from("users-projects")
+      .select(
+        `
+        user_id,
+        user_management (
+          email
+        )
+      `
+      )
+      .eq("project_id", projectId);
+
+    if (error) throw error;
+
+    // Transform the data to match the UserProject type
+    return data.map((item) => ({
+      user_id: item.user_id,
+      email: (item.user_management as unknown as { email: string }).email
+    }));
   }
 };
