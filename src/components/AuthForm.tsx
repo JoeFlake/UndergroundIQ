@@ -59,7 +59,8 @@ const AuthForm = ({ type }: AuthFormProps) => {
         }
         toast({
           title: "Success",
-          description: "Your account has been created and you're now logged in."
+          description:
+            "Your account has been created! Please check your email to confirm your account."
         });
         navigate("/");
       }
