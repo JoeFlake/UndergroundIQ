@@ -104,7 +104,7 @@ const AuthForm = ({ type }: AuthFormProps) => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="transition-all duration-200 focus:ring-2 focus:ring-gray-900 focus:border-transparent"
             />
           </div>
 
@@ -118,11 +118,11 @@ const AuthForm = ({ type }: AuthFormProps) => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-10"
+                className="transition-all duration-200 focus:ring-2 focus:ring-gray-900 focus:border-transparent pr-10"
               />
               <button
                 type="button"
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-gray-900"
                 onClick={toggleShowPassword}
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -134,7 +134,7 @@ const AuthForm = ({ type }: AuthFormProps) => {
         <CardFooter className="flex flex-col">
           <Button
             type="submit"
-            className="w-full transition-all duration-200 bg-blue-600 hover:bg-blue-700"
+            className="w-full transition-all duration-300 bg-gray-900 hover:bg-white hover:text-gray-900 border-2 border-gray-900 text-white"
             disabled={loading}
           >
             {loading ? (
@@ -155,7 +155,7 @@ const AuthForm = ({ type }: AuthFormProps) => {
                 Don't have an account?{" "}
                 <Link
                   to="/signup"
-                  className="text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                  className="text-gray-900 hover:text-gray-500 underline transition-colors"
                 >
                   Sign up
                 </Link>
@@ -165,7 +165,7 @@ const AuthForm = ({ type }: AuthFormProps) => {
                 Already have an account?{" "}
                 <Link
                   to="/login"
-                  className="text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                  className="text-gray-900 hover:text-gray-500 underline transition-colors"
                 >
                   Sign in
                 </Link>

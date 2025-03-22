@@ -152,14 +152,14 @@ const ProjectView = () => {
                   <div>
                     <p className="text-sm text-gray-500">Expiration Date</p>
                     <div className="flex items-center">
-                      <Calendar className="mr-2 h-4 w-4 text-blue-500" />
+                      <Calendar className="mr-2 h-4 w-4 text-gray-500" />
                       <p className="font-medium">{formatDate(currentTicket.expiration_date)}</p>
                     </div>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Legal Date</p>
                     <div className="flex items-center">
-                      <Calendar className="mr-2 h-4 w-4 text-blue-500" />
+                      <Calendar className="mr-2 h-4 w-4 text-gray-500" />
                       <p className="font-medium">{formatDate(currentTicket.legal_date)}</p>
                     </div>
                   </div>
@@ -187,7 +187,7 @@ const ProjectView = () => {
                     href={currentTicket.map_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center text-blue-500 hover:text-blue-700"
+                    className="flex items-center text-black underline hover:text-gray-500"
                   >
                     <span className="font-medium">View</span>
                     <ExternalLink className="ml-1 h-4 w-4" />
@@ -228,7 +228,7 @@ const ProjectView = () => {
                           {ticket.description}
                         </p>
                         <div className="flex items-center mt-2 text-xs text-gray-500">
-                          <Calendar className="mr-1 h-3 w-3" />
+                          <Calendar className="mr-1 h-3 w-3 text-gray-500" />
                           {formatDate(ticket.expiration_date)}
                         </div>
                       </CardContent>

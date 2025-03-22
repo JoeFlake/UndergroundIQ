@@ -168,12 +168,16 @@ export default function Index() {
                     tickets.map((ticket) => (
                       <TableRow
                         key={ticket.ticket_id}
-                        className="cursor-pointer hover:bg-gray-50"
+                        className="hover:bg-gray-50"
                         onClick={() => handleTicketClick(ticket.ticket_id)}
                       >
-                        <TableCell className="font-medium">{ticket.ticket_number}</TableCell>
-                        <TableCell>{getProjectName(ticket.project_id)}</TableCell>
-                        <TableCell>
+                        <TableCell className="cursor-default font-medium">
+                          {ticket.ticket_number}
+                        </TableCell>
+                        <TableCell className="cursor-default">
+                          {getProjectName(ticket.project_id)}
+                        </TableCell>
+                        <TableCell className="cursor-default">
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                               getProjectStatus(ticket.project_id) === "Active"
@@ -186,27 +190,26 @@ export default function Index() {
                             {getProjectStatus(ticket.project_id)}
                           </span>
                         </TableCell>
-                        <TableCell className="whitespace-nowrap">
+                        <TableCell className="cursor-default whitespace-nowrap">
                           <div className="flex items-center">
                             <Calendar className="mr-2 h-4 w-4 text-gray-500" />
                             {formatDate(ticket.expiration_date)}
                           </div>
                         </TableCell>
-                        <TableCell className="hidden md:table-cell max-w-[200px] truncate">
+                        <TableCell className="cursor-default hidden md:table-cell max-w-[200px] truncate">
                           {ticket.description}
                         </TableCell>
                         <TableCell className="text-right">
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="inline-flex items-center px-2 py-1"
-                            onClick={(e) => e.stopPropagation()}
-                            asChild
+                            className="inline-flex items-center p-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.open(ticket.map_url, "_blank");
+                            }}
                           >
-                            <a href={ticket.map_url} target="_blank" rel="noopener noreferrer">
-                              <ExternalLink className="h-4 w-4" />
-                              <span className="ml-1 md:hidden">View</span>
-                            </a>
+                            <ExternalLink className="h-4 w-4" />
                           </Button>
                         </TableCell>
                       </TableRow>
