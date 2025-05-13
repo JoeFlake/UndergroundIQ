@@ -8,7 +8,7 @@ import {
   CardDescription,
   CardFooter,
   CardHeader,
-  CardTitle
+  CardTitle,
 } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,12 +21,12 @@ interface AuthFormProps {
 }
 
 const AuthForm = ({ type }: AuthFormProps) => {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, setUser } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -36,33 +36,32 @@ const AuthForm = ({ type }: AuthFormProps) => {
     setError(null);
 
     try {
-      if (type === "login") {
-        const { error } = await signIn(email, password);
-        if (error) {
-          setError(error.message);
-          return;
+      // Blue Stakes login using form-urlencoded
+      const params = new URLSearchParams();
+      params.append("username", username);
+      params.append("password", password);
+
+      const response = await fetch(
+        "https://newtin-api.bluestakes.org/api/login",
+        {
+          method: "POST",
+          headers: {
+            accept: "application/json",
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: params,
         }
+      );
+      const data = await response.json();
+      if (response.ok && data.Authorization) {
+        setUser({ username, token: data.Authorization });
         toast({
           title: "Success",
-          description: "You've been logged in."
+          description: "You've been logged in via Blue Stakes.",
         });
         navigate("/");
       } else {
-        const { error, user } = await signUp(email, password);
-        if (error) {
-          setError(error.message);
-          return;
-        }
-        if (!user) {
-          setError("Failed to create account. Please try again.");
-          return;
-        }
-        toast({
-          title: "Success",
-          description:
-            "Your account has been created! Please check your email to confirm your account."
-        });
-        navigate("/");
+        setError(data.message || "Login failed");
       }
     } catch (error) {
       setError("An unexpected error occurred");
@@ -97,13 +96,13 @@ const AuthForm = ({ type }: AuthFormProps) => {
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="username">Username</Label>
             <Input
-              id="email"
-              type="email"
-              placeholder="Enter your email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              id="username"
+              type="text"
+              placeholder="Enter your Blue Stakes username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               required
               className="transition-all duration-200 focus:ring-2 focus:ring-gray-900 focus:border-transparent"
             />
@@ -115,7 +114,7 @@ const AuthForm = ({ type }: AuthFormProps) => {
               <Input
                 id="password"
                 type={showPassword ? "text" : "password"}
-                placeholder="Enter your password"
+                placeholder="Enter your Blue Stakes password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -126,7 +125,11 @@ const AuthForm = ({ type }: AuthFormProps) => {
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-gray-900"
                 onClick={toggleShowPassword}
               >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
               </button>
             </div>
           </div>

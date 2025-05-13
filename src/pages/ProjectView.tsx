@@ -2,86 +2,39 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabaseService } from "@/lib/supabaseService";
+import { supabaseService, bluestakesService } from "@/lib/supabaseService";
 import { Ticket, Project, UserProject } from "@/types";
 import { ArrowLeft, Calendar, ExternalLink, MapPin, Users } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const ProjectView = () => {
   const { ticketId } = useParams();
   const navigate = useNavigate();
-  const [currentTicket, setCurrentTicket] = useState<Ticket | null>(null);
-  const [relatedTickets, setRelatedTickets] = useState<Ticket[]>([]);
-  const [projectName, setProjectName] = useState("");
+  const [currentTicket, setCurrentTicket] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [mapImageUrl, setMapImageUrl] = useState<string | null>(null);
-  const [projectUsers, setProjectUsers] = useState<UserProject[]>([]);
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchTicketData = async () => {
-      if (!ticketId) return;
-
+      if (!ticketId || !user || !user.token) return;
       try {
         setLoading(true);
-        setMapImageUrl(null);
-        const ticketIdNum = parseInt(ticketId, 10);
-
-        // Get the current ticket
-        const ticket = await supabaseService.getTicketById(ticketIdNum);
-
-        if (ticket) {
-          setCurrentTicket(ticket);
-
-          // Get the project name and users
-          const project = await supabaseService.getProjectById(ticket.project_id);
-          setProjectName(project?.project_name || "Unknown Project");
-
-          // Get project users
-          const users = await supabaseService.getProjectUsers(ticket.project_id);
-          setProjectUsers(users);
-
-          // Get related tickets
-          const projectTickets = await supabaseService.getTicketsByProjectId(ticket.project_id);
-          setRelatedTickets(projectTickets.filter((t) => t.ticket_id !== ticketIdNum));
-        }
+        const ticket = await bluestakesService.getTicketByNumber(
+          ticketId,
+          user.token
+        );
+        setCurrentTicket(ticket);
       } catch (error) {
         console.error("Error fetching ticket data:", error);
       } finally {
         setLoading(false);
       }
     };
-
     fetchTicketData();
-  }, [ticketId]);
-
-  useEffect(() => {
-    const fetchMapImage = async (url: string) => {
-      try {
-        const response = await fetch(url);
-        const html = await response.text();
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, "text/html");
-        const mapImage = doc.querySelector("img.mapsize#O") as HTMLImageElement;
-        if (mapImage) {
-          setMapImageUrl(mapImage.src);
-        }
-      } catch (error) {
-        console.error("Error fetching map image:", error);
-      }
-    };
-
-    if (currentTicket?.map_url) {
-      fetchMapImage(currentTicket.map_url);
-    }
-  }, [currentTicket?.map_url]);
+  }, [ticketId, user]);
 
   const handleBack = () => {
     navigate("/");
-  };
-
-  // Function to format date
-  const formatDate = (dateString: string) => {
-    const options: Intl.DateTimeFormatOptions = { year: "numeric", month: "short", day: "numeric" };
-    return new Date(dateString).toLocaleDateString(undefined, options);
   };
 
   if (loading) {
@@ -100,7 +53,9 @@ const ProjectView = () => {
       <div className="min-h-screen flex items-center justify-center">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-center text-red-500">Ticket Not Found</CardTitle>
+            <CardTitle className="text-center text-red-500">
+              Ticket Not Found
+            </CardTitle>
           </CardHeader>
           <CardContent className="text-center">
             <div className="flex flex-col items-center justify-center h-full">
@@ -119,6 +74,62 @@ const ProjectView = () => {
     );
   }
 
+  // Compute status
+  const isActive =
+    currentTicket.expires && new Date(currentTicket.expires) > new Date();
+  const status = isActive
+    ? "Active"
+    : currentTicket.expires
+    ? "Expired"
+    : currentTicket.status ||
+      currentTicket.type ||
+      currentTicket.revision ||
+      "No status";
+  // Fallbacks for description
+  const description =
+    currentTicket.comments ||
+    currentTicket.description ||
+    currentTicket.type ||
+    "No description";
+  // Dates
+  const formatDate = (dateString) => {
+    if (!dateString) return "-";
+    const options = { year: "numeric", month: "short", day: "numeric" };
+    return new Date(dateString).toLocaleDateString(undefined, options);
+  };
+  // Google Maps URL from centroid or extent
+  const parseCoord = (val) => {
+    if (typeof val === "number") return val;
+    if (!val) return null;
+    const trimmed = String(val).trim();
+    if (trimmed === "" || trimmed === " ") return null;
+    const num = Number(trimmed);
+    return isNaN(num) ? null : num;
+  };
+  let lat = parseCoord(currentTicket.centroid_y);
+  let lng = parseCoord(currentTicket.centroid_x);
+  // Fallback to extent average if centroid is not valid
+  if (
+    (lat === null || lng === null) &&
+    currentTicket.extent_top &&
+    currentTicket.extent_left &&
+    currentTicket.extent_bottom &&
+    currentTicket.extent_right
+  ) {
+    const top = parseCoord(currentTicket.extent_top);
+    const left = parseCoord(currentTicket.extent_left);
+    const bottom = parseCoord(currentTicket.extent_bottom);
+    const right = parseCoord(currentTicket.extent_right);
+    if ([top, left, bottom, right].every((v) => v !== null)) {
+      lat = (top + bottom) / 2;
+      lng = (left + right) / 2;
+    }
+  }
+  const hasCoords = lat !== null && lng !== null;
+  const googleMapsUrl = hasCoords
+    ? `https://www.google.com/maps?q=${lat},${lng}&z=17&output=embed`
+    : null;
+
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-6xl mx-auto">
@@ -129,114 +140,225 @@ const ProjectView = () => {
 
         <Card className="mb-8 animate-fade-in">
           <CardHeader>
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
               <div>
-                <p className="text-sm text-gray-500 mb-1">Project</p>
-                <CardTitle className="text-2xl">{projectName}</CardTitle>
+                <p className="text-sm text-gray-500 mb-1">Ticket Number</p>
+                <CardTitle className="text-2xl">
+                  {currentTicket.ticket}
+                </CardTitle>
+                <div className="text-gray-600 text-sm mt-1">
+                  Revision: {currentTicket.revision || "-"}
+                </div>
               </div>
               <div className="text-right">
-                <p className="text-sm text-gray-500 mb-1">Ticket Number</p>
-                <p className="text-xl font-semibold">{currentTicket.ticket_number}</p>
+                <p className="text-sm text-gray-500 mb-1">Status</p>
+                <p className="text-xl font-semibold">{status}</p>
+                <div className="text-gray-600 text-sm mt-1">
+                  Type: {currentTicket.type || "-"}
+                </div>
+                <div className="text-gray-600 text-sm mt-1">
+                  Priority: {currentTicket.priority || "-"}
+                </div>
+                <div className="text-gray-600 text-sm mt-1">
+                  Category: {currentTicket.category || "-"}
+                </div>
               </div>
             </div>
           </CardHeader>
           <CardContent>
             <div className="grid md:grid-cols-2 gap-8">
-              <div>
-                <h3 className="text-lg font-medium mb-2">Ticket Details</h3>
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-sm text-gray-500">Description</p>
-                    <p className="font-medium">{currentTicket.description}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Expiration Date</p>
-                    <div className="flex items-center">
-                      <Calendar className="mr-2 h-4 w-4 text-gray-500" />
-                      <p className="font-medium">{formatDate(currentTicket.expiration_date)}</p>
+              {/* Left: General Info & Dates */}
+              <div className="space-y-8">
+                <section>
+                  <h3 className="text-lg font-medium mb-2">General Info</h3>
+                  <div className="space-y-1">
+                    <div>
+                      <span className="font-semibold">Account:</span>{" "}
+                      {currentTicket.account || "-"}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Name:</span>{" "}
+                      {currentTicket.name || "-"}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Address:</span>{" "}
+                      {currentTicket.address1 || "-"}{" "}
+                      {currentTicket.address2 || ""},{" "}
+                      {currentTicket.city || "-"}, {currentTicket.state || "-"}{" "}
+                      {currentTicket.zip || ""}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Subdivision:</span>{" "}
+                      {currentTicket.subdivision || "-"}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Lot:</span>{" "}
+                      {currentTicket.lot || "-"}
                     </div>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Legal Date</p>
-                    <div className="flex items-center">
-                      <Calendar className="mr-2 h-4 w-4 text-gray-500" />
-                      <p className="font-medium">{formatDate(currentTicket.legal_date)}</p>
+                </section>
+                <section>
+                  <h3 className="text-lg font-medium mb-2">Dates</h3>
+                  <div className="space-y-1">
+                    <div>
+                      <span className="font-semibold">Completed:</span>{" "}
+                      {formatDate(currentTicket.completed)}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Started:</span>{" "}
+                      {formatDate(currentTicket.started)}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Original Date:</span>{" "}
+                      {formatDate(currentTicket.original_date)}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Replace By Date:</span>{" "}
+                      {formatDate(currentTicket.replace_by_date)}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Expiration:</span>{" "}
+                      {formatDate(currentTicket.expires)}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Legal Date:</span>{" "}
+                      {formatDate(currentTicket.legal_date)}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Work Date:</span>{" "}
+                      {formatDate(currentTicket.work_date)}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Response Due:</span>{" "}
+                      {formatDate(currentTicket.response_due)}
                     </div>
                   </div>
-                </div>
-                <div className="mt-8">
-                  <h3 className="text-lg font-medium mb-2">Project Users</h3>
-                  <div className="space-y-2">
-                    {projectUsers.length > 0 ? (
-                      projectUsers.map((user) => (
-                        <div key={user.user_id} className="flex items-center text-sm">
-                          <Users className="mr-2 h-4 w-4 text-gray-500" />
-                          <span>{user.email}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-sm text-gray-500">No users assigned to this project</p>
-                    )}
+                </section>
+                <section>
+                  <h3 className="text-lg font-medium mb-2">Contacts</h3>
+                  <div className="space-y-1">
+                    <div>
+                      <span className="font-semibold">Caller:</span>{" "}
+                      {currentTicket.caller || "-"}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Caller Phone:</span>{" "}
+                      {currentTicket.caller_phone || "-"}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Contact:</span>{" "}
+                      {currentTicket.contact || "-"}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Contact Phone:</span>{" "}
+                      {currentTicket.contact_phone || "-"}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Email:</span>{" "}
+                      {currentTicket.email || "-"}
+                    </div>
                   </div>
-                </div>
+                </section>
+                <section>
+                  <h3 className="text-lg font-medium mb-2">
+                    Work/Project Details
+                  </h3>
+                  <div className="space-y-1">
+                    <div>
+                      <span className="font-semibold">Work Type:</span>{" "}
+                      {currentTicket.work_type || "-"}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Done For:</span>{" "}
+                      {currentTicket.done_for || "-"}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Header:</span>{" "}
+                      {currentTicket.header || "-"}
+                    </div>
+                  </div>
+                </section>
+                <section>
+                  <h3 className="text-lg font-medium mb-2">Remarks/Notes</h3>
+                  <div className="space-y-1">
+                    <div>
+                      <span className="font-semibold">Location:</span>{" "}
+                      {currentTicket.location || "-"}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Remarks:</span>{" "}
+                      {currentTicket.remarks || "-"}
+                    </div>
+                  </div>
+                </section>
               </div>
+              {/* Right: Map & Location */}
               <div>
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="text-lg font-medium">Location</h3>
-                  <a
-                    href={currentTicket.map_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center text-black underline hover:text-gray-500"
-                  >
-                    <span className="font-medium">View</span>
-                    <ExternalLink className="ml-1 h-4 w-4" />
-                  </a>
-                </div>
-                <div className="relative h-60 bg-gray-100 rounded-lg overflow-hidden">
-                  {mapImageUrl ? (
-                    <img
-                      src={mapImageUrl}
-                      alt="Map Preview"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <MapPin className="h-12 w-12 text-gray-300" />
-                      <p className="text-gray-500 text-center absolute top-1/2 left-0 right-0 mt-6">
-                        Loading map preview...
-                      </p>
-                    </div>
-                  )}
+                <h3 className="text-lg font-medium mb-2">Map & Location</h3>
+                {hasCoords ? (
+                  <iframe
+                    src={googleMapsUrl}
+                    title="Google Map"
+                    width="100%"
+                    height="350"
+                    style={{ border: 0 }}
+                    allowFullScreen=""
+                    loading="lazy"
+                  ></iframe>
+                ) : currentTicket.map_url ? (
+                  <iframe
+                    src={currentTicket.map_url}
+                    title="Ticket Map"
+                    width="100%"
+                    height="350"
+                    style={{ border: 0 }}
+                    allowFullScreen=""
+                    loading="lazy"
+                  ></iframe>
+                ) : (
+                  <div className="text-gray-500">
+                    No map available for this ticket.
+                  </div>
+                )}
+                <div className="mt-4">
+                  <div>
+                    <span className="font-semibold">Centroid:</span>{" "}
+                    {lat !== null && lng !== null ? `${lat}, ${lng}` : "-"}
+                  </div>
+                  <div>
+                    <span className="font-semibold">Extent:</span>{" "}
+                    {currentTicket.extent_top &&
+                    currentTicket.extent_left &&
+                    currentTicket.extent_bottom &&
+                    currentTicket.extent_right
+                      ? `${currentTicket.extent_top}, ${currentTicket.extent_left}, ${currentTicket.extent_bottom}, ${currentTicket.extent_right}`
+                      : "-"}
+                  </div>
+                  <div>
+                    <span className="font-semibold">Subdivision:</span>{" "}
+                    {currentTicket.subdivision || "-"}
+                  </div>
+                  <div>
+                    <span className="font-semibold">Street:</span>{" "}
+                    {currentTicket.street || "-"}{" "}
+                    {currentTicket.st_from_address || ""} -{" "}
+                    {currentTicket.st_to_address || ""}
+                  </div>
+                  <div>
+                    <span className="font-semibold">City/Place:</span>{" "}
+                    {currentTicket.city || "-"} / {currentTicket.place || "-"}
+                  </div>
+                  <div>
+                    <span className="font-semibold">County:</span>{" "}
+                    {currentTicket.county || "-"}
+                  </div>
+                  <div>
+                    <span className="font-semibold">State:</span>{" "}
+                    {currentTicket.state || "-"}
+                  </div>
                 </div>
               </div>
             </div>
-
-            {relatedTickets.length > 0 && (
-              <div className="mt-8">
-                <h3 className="text-lg font-medium mb-4">Other Tickets for this Project</h3>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {relatedTickets.map((ticket) => (
-                    <Card
-                      key={ticket.ticket_id}
-                      className="cursor-pointer hover:shadow-md transition-shadow"
-                      onClick={() => navigate(`/project/${ticket.ticket_id}`)}
-                    >
-                      <CardContent className="pt-6">
-                        <p className="font-semibold">{ticket.ticket_number}</p>
-                        <p className="text-sm text-gray-500 line-clamp-2 mt-1">
-                          {ticket.description}
-                        </p>
-                        <div className="flex items-center mt-2 text-xs text-gray-500">
-                          <Calendar className="mr-1 h-3 w-3 text-gray-500" />
-                          {formatDate(ticket.expiration_date)}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            )}
           </CardContent>
         </Card>
       </div>

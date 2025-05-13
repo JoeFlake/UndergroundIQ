@@ -1,18 +1,23 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { Session, User, AuthError } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabase";
 import { useNavigate } from "react-router-dom";
 
+// Add a User type for Blue Stakes login
+interface BlueStakesUser {
+  username: string;
+  token: string;
+}
+
 type AuthContextType = {
-  session: Session | null;
-  user: User | null;
+  session: null;
+  user: BlueStakesUser | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  signIn: (username: string, password: string) => Promise<{ error: null }>;
   signUp: (
     email: string,
     password: string
-  ) => Promise<{ error: AuthError | null; user: User | null }>;
-  signOut: () => Promise<{ error: AuthError | null }>;
+  ) => Promise<{ error: null; user: null }>;
+  signOut: () => Promise<{ error: null }>;
+  setUser: React.Dispatch<React.SetStateAction<BlueStakesUser | null>>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -20,61 +25,30 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export { AuthContext };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<null>(null);
+  const [user, setUser] = useState<BlueStakesUser | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check active sessions and sets the user
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    // Listen for changes on auth state (logged in, signed out, etc.)
-    const {
-      data: { subscription }
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    setLoading(false);
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-
-    if (!error) {
-      navigate("/");
-    }
-    return { error };
+  const signIn = async (username: string, password: string) => {
+    setUser({ username }); // Mark user as logged in
+    navigate("/");
+    return { error: null };
   };
 
   const signUp = async (email: string, password: string) => {
-    const { error, data } = await supabase.auth.signUp({
-      email,
-      password
-    });
-
-    if (!error) {
-      navigate("/login");
-    }
-    return { error, user: data.user };
+    navigate("/login");
+    return { error: null, user: null };
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (!error) {
-      navigate("/login");
-    }
-    return { error };
+    setUser(null);
+    navigate("/login");
+    return { error: null };
   };
 
   const value: AuthContextType = {
@@ -83,7 +57,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading,
     signIn,
     signUp,
-    signOut
+    signOut,
+    setUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

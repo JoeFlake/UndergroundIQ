@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { supabaseService } from "@/lib/supabaseService";
+import { bluestakesService } from "@/lib/supabaseService";
+import { useAuth } from "@/contexts/AuthContext";
 import type { Project, Ticket } from "@/types";
 
 export const useTicketData = () => {
@@ -11,28 +12,32 @@ export const useTicketData = () => {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [showActiveOnly, setShowActiveOnly] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         setError("");
-
-        // Fetch projects and tickets
-        const projectsData = await supabaseService.getUserProjects();
-        const ticketsData = await supabaseService.getUserTickets();
-
-        setProjects(projectsData);
+        if (!user || !user.token) {
+          setTickets([]);
+          setProjects([]);
+          setLoading(false);
+          return;
+        }
+        // Fetch all tickets for the user from Blue Stakes API
+        const ticketsData = await bluestakesService.getAllTickets(user.token);
+        console.log("Tickets data from API:", ticketsData);
         setTickets(ticketsData);
+        setProjects([]);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to fetch data");
       } finally {
         setLoading(false);
       }
     };
-
     fetchData();
-  }, []);
+  }, [user]);
 
   // Filter tickets by project
   const filterByProject = (projectId: string) => {
@@ -48,13 +53,17 @@ export const useTicketData = () => {
   const filteredAndSortedTickets = tickets
     .filter((ticket) => {
       const projectMatch =
-        selectedProject === "all" || ticket.project_id.toString() === selectedProject;
-      const activeMatch = !showActiveOnly || new Date(ticket.expiration_date) > new Date();
+        selectedProject === "all" ||
+        ticket.project_id.toString() === selectedProject;
+      const activeMatch =
+        !showActiveOnly || new Date(ticket.expiration_date) > new Date();
 
       // Search filter
       const searchMatch =
         !searchQuery ||
-        ticket.ticket_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        ticket.ticket_number
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase()) ||
         ticket.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
         projects
           .find((p) => p.project_id === ticket.project_id)
@@ -81,6 +90,6 @@ export const useTicketData = () => {
     filterByProject,
     toggleSortDirection,
     setShowActiveOnly,
-    setSearchQuery
+    setSearchQuery,
   };
 };
