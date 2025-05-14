@@ -1,16 +1,34 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "./ui/button";
-import { User } from "lucide-react";
+import { User, Folder, Home as HomeIcon } from "lucide-react";
 import logo from "../assets/images/LogoWide.png";
 
 export function Navbar() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, signOut } = useAuth();
 
   const handleSignOut = async () => {
     await signOut();
     navigate("/login");
+  };
+
+  const isActive = (path: string) => {
+    // Home is '/' or '/tickets', Projects is '/projects'
+    if (
+      location.pathname === "/tickets" &&
+      location.search.includes("project=")
+    )
+      return false;
+    if (
+      path === "/" &&
+      (location.pathname === "/" ||
+        (location.pathname === "/tickets" &&
+          !location.search.includes("project=")))
+    )
+      return true;
+    return location.pathname.startsWith(path) && path !== "/";
   };
 
   return (
@@ -22,12 +40,28 @@ export function Navbar() {
               <img src={logo} alt="UndergroundIQ" className="h-8 w-auto" />
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-              <a
-                href="#/"
-                className="border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-gray-200 focus:ring-opacity-75 rounded-sm"
+              <button
+                onClick={() => navigate("/tickets")}
+                className={`border-b-2 px-1 pt-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-gray-200 focus:ring-opacity-75 rounded-sm inline-flex items-center ${
+                  isActive("/")
+                    ? "border-orange-500 text-orange-600"
+                    : "border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-900"
+                }`}
               >
+                <HomeIcon className="h-4 w-4 mr-2" />
                 Home
-              </a>
+              </button>
+              <button
+                onClick={() => navigate("/projects")}
+                className={`border-b-2 px-1 pt-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-gray-200 focus:ring-opacity-75 rounded-sm inline-flex items-center ${
+                  isActive("/projects")
+                    ? "border-orange-500 text-orange-600"
+                    : "border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-900"
+                }`}
+              >
+                <Folder className="h-4 w-4 mr-2" />
+                Projects
+              </button>
             </div>
           </div>
           <div className="flex items-center space-x-4">

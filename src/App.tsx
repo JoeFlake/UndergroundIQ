@@ -13,6 +13,8 @@ import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
 import ProjectView from "./pages/ProjectView";
 import AdminPanel from "./pages/AdminPanel";
+import Projects from "./pages/Projects";
+import Tickets from "./pages/Index";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +31,22 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Index />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/tickets"
+              element={
+                <ProtectedRoute>
+                  <Tickets />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/projects"
+              element={
+                <ProtectedRoute>
+                  <Projects />
                 </ProtectedRoute>
               }
             />

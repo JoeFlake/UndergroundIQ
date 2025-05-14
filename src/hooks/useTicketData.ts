@@ -52,35 +52,29 @@ export const useTicketData = () => {
   // Filter and sort tickets based on current state
   const filteredAndSortedTickets = tickets
     .filter((ticket) => {
-      const projectMatch =
-        selectedProject === "all" ||
-        ticket.project_id.toString() === selectedProject;
+      // Only filter by active if showActiveOnly is true
       const activeMatch =
-        !showActiveOnly || new Date(ticket.expiration_date) > new Date();
+        !showActiveOnly || new Date(ticket.expires) > new Date();
 
       // Search filter
       const searchMatch =
         !searchQuery ||
-        ticket.ticket_number
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase()) ||
-        ticket.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        projects
-          .find((p) => p.project_id === ticket.project_id)
-          ?.project_name.toLowerCase()
-          .includes(searchQuery.toLowerCase());
+        ticket.ticket.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (ticket.description &&
+          ticket.description.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      return projectMatch && activeMatch && searchMatch;
+      return activeMatch && searchMatch;
     })
     .sort((a, b) => {
-      const dateA = new Date(a.expiration_date).getTime();
-      const dateB = new Date(b.expiration_date).getTime();
+      const dateA = new Date(a.expires).getTime();
+      const dateB = new Date(b.expires).getTime();
       return sortDirection === "asc" ? dateA - dateB : dateB - dateA;
     });
 
   return {
     projects,
-    tickets: filteredAndSortedTickets,
+    tickets,
+    filteredTickets: filteredAndSortedTickets,
     loading,
     error,
     selectedProject,

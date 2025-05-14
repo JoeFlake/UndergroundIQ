@@ -4,16 +4,33 @@ export interface Project {
 }
 
 export interface Ticket {
-  ticket_id: number;
-  ticket_number: string;
-  project_id: number;
+  ticket: string;
+  revision: string;
+  completed: string;
+  type: string;
+  priority: string;
+  category: string;
+  lookup: string;
+  channel: string;
+  taken_source: string;
+  taken_version: string;
+  started: string;
+  original_ticket: string;
+  original_date: string;
+  replaced_by_ticket: string;
+  replace_by_date: string;
+  expires: string;
+  reference: string;
+  account: string;
+  original_account: string;
+  caller_type: string;
+  name: string;
+  address1: string;
+  address2: string;
+  city: string;
+  state: string;
+  zip: string;
   description: string;
-  expiration_date: string;
-  legal_date: string;
-  update_date: string;
-  map_url: string;
-  full_ticket: string;
-  old_ticket_numbers: string[];
 }
 
 export interface UserProject {

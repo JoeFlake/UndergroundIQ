@@ -42,59 +42,22 @@ import {
 } from "lucide-react";
 import { Checkbox } from "../components/ui/checkbox";
 
-// Define a Ticket type that matches the Blue Stakes API response
-interface Ticket {
-  ticket: string;
-  revision: string;
-  completed: string;
-  type: string;
-  priority: string;
-  category: string;
-  lookup: string;
-  channel: string;
-  taken_source: string;
-  taken_version: string;
-  started: string;
-  original_ticket: string;
-  original_date: string;
-  replaced_by_ticket: string;
-  replace_by_date: string;
-  expires: string;
-  reference: string;
-  account: string;
-  original_account: string;
-  caller_type: string;
-  name: string;
-  address1: string;
-  address2: string;
-  city: string;
-  state: string;
-  zip: string;
-  description: string;
-  // ... (add more fields as needed)
-}
-
-// Utility function to capitalize each word in a string
-function capitalizeWords(str: string) {
-  return str.replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
 export default function Tickets() {
   const { user } = useAuth();
   const {
-    filteredTickets: tickets,
+    tickets,
     loading,
     error,
     showActiveOnly,
     setShowActiveOnly,
+    sortBy,
+    setSortBy,
+    sortOrder,
+    setSortOrder,
   } = useTicketData();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
-
-  // Local sorting state
-  const [sortBy, setSortBy] = useState("ticket");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
   // Get project filter from URL params
   const projectFilter = searchParams.get("project");
@@ -113,10 +76,9 @@ export default function Tickets() {
           ticket.state?.trim(),
           ticket.zip?.trim(),
         ]
-          .filter((part) => part && part !== "")
-          .join(", ")
-          .toLowerCase();
-        return ticketAddress === (projectFilter?.toLowerCase() || "");
+          .filter(Boolean)
+          .join(", ");
+        return ticketAddress === projectFilter;
       });
     }
 
@@ -128,14 +90,15 @@ export default function Tickets() {
           ticket.description
             ?.toLowerCase()
             .includes(searchQuery.toLowerCase()) ||
-          ticket.address1?.toLowerCase().includes(searchQuery.toLowerCase())
+          ticket.address1?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          ticket.comments?.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
     return filtered;
   }, [tickets, projectFilter, searchQuery]);
 
-  const handleTicketClick = (ticket: Ticket) => {
+  const handleTicketClick = (ticket: any) => {
     navigate(`/project/${ticket.ticket}`);
   };
 
@@ -168,17 +131,19 @@ export default function Tickets() {
   };
 
   // Get status from expiration date
-  const getStatus = (ticket: Ticket) => {
+  const getStatus = (ticket: any) => {
     if (ticket.expires) {
       const isActive = new Date(ticket.expires) > new Date();
       return isActive ? "Active" : "Expired";
     }
-    return ticket.type || ticket.revision || "No status";
+    return ticket.status || ticket.type || ticket.revision || "No status";
   };
 
   // Get description from available fields
-  const getDescription = (ticket: Ticket) => {
-    return ticket.description || ticket.type || "No description";
+  const getDescription = (ticket: any) => {
+    return (
+      ticket.comments || ticket.description || ticket.type || "No description"
+    );
   };
 
   if (loading) {
@@ -222,14 +187,14 @@ export default function Tickets() {
             <div>
               <Button
                 variant="ghost"
-                onClick={() => navigate("/projects")}
+                onClick={() => navigate("/")}
                 className="mb-2"
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Projects
               </Button>
               <h1 className="text-3xl font-bold text-gray-900">
-                Tickets for: {capitalizeWords(projectFilter || "")}
+                Tickets for: {projectFilter}
               </h1>
               <p className="text-gray-600 mt-2">
                 Viewing all tickets for this project location
@@ -265,7 +230,7 @@ export default function Tickets() {
             <Checkbox
               id="show-active-only"
               checked={showActiveOnly}
-              onCheckedChange={(checked) => setShowActiveOnly(checked === true)}
+              onCheckedChange={setShowActiveOnly}
             />
             <label htmlFor="show-active-only" className="text-sm font-medium">
               Show Active Only
@@ -273,22 +238,17 @@ export default function Tickets() {
           </div>
 
           {/* Sort Controls */}
-          <div className="flex items-center space-x-2">
-            <label htmlFor="sort-by-select" className="text-sm font-medium">
-              Order by:
-            </label>
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger id="sort-by-select" className="w-48">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ticket">Ticket Number</SelectItem>
-                <SelectItem value="expires">Expiration Date</SelectItem>
-                <SelectItem value="original_date">Original Date</SelectItem>
-                <SelectItem value="replace_by_date">Replace By Date</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ticket">Ticket Number</SelectItem>
+              <SelectItem value="expires">Expiration Date</SelectItem>
+              <SelectItem value="original_date">Original Date</SelectItem>
+              <SelectItem value="replace_by_date">Replace By Date</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Summary Stats */}
