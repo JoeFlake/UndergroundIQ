@@ -156,12 +156,6 @@ const ProjectView = () => {
                 <div className="text-gray-600 text-sm mt-1">
                   Type: {currentTicket.type || "-"}
                 </div>
-                <div className="text-gray-600 text-sm mt-1">
-                  Priority: {currentTicket.priority || "-"}
-                </div>
-                <div className="text-gray-600 text-sm mt-1">
-                  Category: {currentTicket.category || "-"}
-                </div>
               </div>
             </div>
           </CardHeader>
@@ -170,97 +164,27 @@ const ProjectView = () => {
               {/* Left: General Info & Dates */}
               <div className="space-y-8">
                 <section>
-                  <h3 className="text-lg font-medium mb-2">General Info</h3>
-                  <div className="space-y-1">
-                    <div>
-                      <span className="font-semibold">Account:</span>{" "}
-                      {currentTicket.account || "-"}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Name:</span>{" "}
-                      {currentTicket.name || "-"}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Address:</span>{" "}
-                      {currentTicket.address1 || "-"}{" "}
-                      {currentTicket.address2 || ""},{" "}
-                      {currentTicket.city || "-"}, {currentTicket.state || "-"}{" "}
-                      {currentTicket.zip || ""}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Subdivision:</span>{" "}
-                      {currentTicket.subdivision || "-"}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Lot:</span>{" "}
-                      {currentTicket.lot || "-"}
-                    </div>
-                  </div>
+                  <h3 className="text-3xl font-medium mb-2 text-gray-600">General Info</h3>
                 </section>
                 <section>
-                  <h3 className="text-lg font-medium mb-2">Dates</h3>
+                  <h3 className="text-xl font-medium mb-2">Dates</h3>
                   <div className="space-y-1">
-                    <div>
-                      <span className="font-semibold">Completed:</span>{" "}
-                      {formatDate(currentTicket.completed)}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Started:</span>{" "}
-                      {formatDate(currentTicket.started)}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Original Date:</span>{" "}
-                      {formatDate(currentTicket.original_date)}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Replace By Date:</span>{" "}
-                      {formatDate(currentTicket.replace_by_date)}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Expiration:</span>{" "}
-                      {formatDate(currentTicket.expires)}
-                    </div>
                     <div>
                       <span className="font-semibold">Legal Date:</span>{" "}
                       {formatDate(currentTicket.legal_date)}
                     </div>
                     <div>
-                      <span className="font-semibold">Work Date:</span>{" "}
-                      {formatDate(currentTicket.work_date)}
+                      <span className="font-semibold">Update-By Date:</span>{" "}
+                      {formatDate(currentTicket.replace_by_date)}
                     </div>
                     <div>
-                      <span className="font-semibold">Response Due:</span>{" "}
-                      {formatDate(currentTicket.response_due)}
+                      <span className="font-semibold">Expiration Date:</span>{" "}
+                      {formatDate(currentTicket.expires)}
                     </div>
                   </div>
                 </section>
                 <section>
-                  <h3 className="text-lg font-medium mb-2">Contacts</h3>
-                  <div className="space-y-1">
-                    <div>
-                      <span className="font-semibold">Caller:</span>{" "}
-                      {currentTicket.caller || "-"}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Caller Phone:</span>{" "}
-                      {currentTicket.caller_phone || "-"}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Contact:</span>{" "}
-                      {currentTicket.contact || "-"}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Contact Phone:</span>{" "}
-                      {currentTicket.contact_phone || "-"}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Email:</span>{" "}
-                      {currentTicket.email || "-"}
-                    </div>
-                  </div>
-                </section>
-                <section>
-                  <h3 className="text-lg font-medium mb-2">
+                  <h3 className="text-xl font-medium mb-2">
                     Work/Project Details
                   </h3>
                   <div className="space-y-1">
@@ -272,14 +196,10 @@ const ProjectView = () => {
                       <span className="font-semibold">Done For:</span>{" "}
                       {currentTicket.done_for || "-"}
                     </div>
-                    <div>
-                      <span className="font-semibold">Header:</span>{" "}
-                      {currentTicket.header || "-"}
-                    </div>
                   </div>
                 </section>
                 <section>
-                  <h3 className="text-lg font-medium mb-2">Remarks/Notes</h3>
+                  <h3 className="text-xl font-medium mb-2">Remarks/Notes</h3>
                   <div className="space-y-1">
                     <div>
                       <span className="font-semibold">Location:</span>{" "}
@@ -294,7 +214,7 @@ const ProjectView = () => {
               </div>
               {/* Right: Map & Location */}
               <div>
-                <h3 className="text-lg font-medium mb-2">Map & Location</h3>
+                <h3 className="text-3xl font-medium mb-2 text-gray-600">Map & Location</h3>
                 {hasCoords ? (
                   <iframe
                     src={googleMapsUrl}
@@ -322,31 +242,12 @@ const ProjectView = () => {
                 )}
                 <div className="mt-4">
                   <div>
-                    <span className="font-semibold">Centroid:</span>{" "}
-                    {lat !== null && lng !== null ? `${lat}, ${lng}` : "-"}
-                  </div>
-                  <div>
-                    <span className="font-semibold">Extent:</span>{" "}
-                    {currentTicket.extent_top &&
-                    currentTicket.extent_left &&
-                    currentTicket.extent_bottom &&
-                    currentTicket.extent_right
-                      ? `${currentTicket.extent_top}, ${currentTicket.extent_left}, ${currentTicket.extent_bottom}, ${currentTicket.extent_right}`
-                      : "-"}
-                  </div>
-                  <div>
-                    <span className="font-semibold">Subdivision:</span>{" "}
-                    {currentTicket.subdivision || "-"}
-                  </div>
-                  <div>
                     <span className="font-semibold">Street:</span>{" "}
                     {currentTicket.street || "-"}{" "}
-                    {currentTicket.st_from_address || ""} -{" "}
-                    {currentTicket.st_to_address || ""}
                   </div>
                   <div>
-                    <span className="font-semibold">City/Place:</span>{" "}
-                    {currentTicket.city || "-"} / {currentTicket.place || "-"}
+                    <span className="font-semibold">City:</span>{" "}
+                    {currentTicket.place || "-"}
                   </div>
                   <div>
                     <span className="font-semibold">County:</span>{" "}
