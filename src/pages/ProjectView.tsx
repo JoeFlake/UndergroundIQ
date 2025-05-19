@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabaseService, bluestakesService } from "@/lib/supabaseService";
+import { /*supabaseService, */bluestakesService } from "@/lib/supabaseService";
 import { Ticket, Project, UserProject } from "@/types";
 import { ArrowLeft, Calendar, ExternalLink, MapPin, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -94,7 +94,11 @@ const ProjectView = () => {
   // Dates
   const formatDate = (dateString) => {
     if (!dateString) return "-";
-    const options = { year: "numeric", month: "short", day: "numeric" };
+    const options: Intl.DateTimeFormatOptions = { 
+      year: "numeric" as const, 
+      month: "short" as const, 
+      day: "numeric" as const 
+    };
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
   // Google Maps URL from centroid or extent
@@ -205,10 +209,6 @@ const ProjectView = () => {
                       <span className="font-semibold">Location:</span>{" "}
                       {currentTicket.location || "-"}
                     </div>
-                    <div>
-                      <span className="font-semibold">Remarks:</span>{" "}
-                      {currentTicket.remarks || "-"}
-                    </div>
                   </div>
                 </section>
               </div>
@@ -222,7 +222,7 @@ const ProjectView = () => {
                     width="100%"
                     height="350"
                     style={{ border: 0 }}
-                    allowFullScreen=""
+                    allowFullScreen={true}
                     loading="lazy"
                   ></iframe>
                 ) : currentTicket.map_url ? (
@@ -232,7 +232,7 @@ const ProjectView = () => {
                     width="100%"
                     height="350"
                     style={{ border: 0 }}
-                    allowFullScreen=""
+                    allowFullScreen={true}
                     loading="lazy"
                   ></iframe>
                 ) : (

@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = async (username: string, password: string) => {
-    setUser({ username }); // Mark user as logged in
+    setUser({ username, token: "mock-token" }); // Mark user as logged in
     navigate("/");
     return { error: null };
   };

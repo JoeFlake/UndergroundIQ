@@ -39,6 +39,18 @@ export const bluestakesService = {
     if (!response.ok) throw new Error("Failed to fetch ticket");
     return await response.json();
   },
+  // Fetch responses for a ticket
+  getResponsesByTicket: async (ticketNumber, token) => {
+    const authHeader = token.startsWith("Bearer ") ? token : "Bearer " + token;
+    const response = await fetch(`${BASE_URL}/tickets/${ticketNumber}/responses`, {
+      headers: {
+        accept: "application/json", 
+        Authorization: authHeader,
+      },
+    });
+    if (!response.ok) throw new Error("Failed to fetch ticket responses");
+    return await response.json();
+  },
 
   // Fetch a list of states
   getStates: async () => {
