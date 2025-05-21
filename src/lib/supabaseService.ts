@@ -9,7 +9,7 @@ interface ProjectResponse {
   };
 }
 
-const BASE_URL = "https://newtin-api.bluestakes.org/api";
+const BASE_URL = "https://newtiny-api.bluestakes.org/api";
 
 export const bluestakesService = {
   // Fetch all tickets for the user

@@ -11,7 +11,9 @@ const ProjectView = () => {
   const { ticketId } = useParams();
   const navigate = useNavigate();
   const [currentTicket, setCurrentTicket] = useState(null);
+  const [responses, setResponses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [responsesLoading, setResponsesLoading] = useState(true);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -31,6 +33,33 @@ const ProjectView = () => {
       }
     };
     fetchTicketData();
+  }, [ticketId, user]);
+
+  useEffect(() => {
+    const fetchResponses = async () => {
+      if (!ticketId || !user || !user.token) {
+        console.log('Missing required data:', { ticketId, hasUser: !!user, hasToken: !!user?.token });
+        return;
+      }
+      try {
+        setResponsesLoading(true);
+        console.log('Fetching responses for ticket:', ticketId);
+        const responsesData = await bluestakesService.getResponsesByTicket(
+          ticketId,
+          user.token
+        );
+        console.log('Received responses data:', responsesData);
+        // Check if responses is nested in the data
+        const actualResponses = responsesData.responses || responsesData;
+        console.log('Processed responses:', actualResponses);
+        setResponses(actualResponses);
+      } catch (error) {
+        console.error("Error fetching responses data:", error);
+      } finally {
+        setResponsesLoading(false);
+      }
+    };
+    fetchResponses();
   }, [ticketId, user]);
 
   const handleBack = () => {
@@ -131,9 +160,9 @@ const ProjectView = () => {
   }
   const hasCoords = lat !== null && lng !== null;
   const googleMapsUrl = hasCoords
-    ? `https://www.google.com/maps?q=${lat},${lng}&z=17&output=embed`
+    ? `https://www.google.com/maps?q=${lat},${lng}&z=17&output=embed&style=feature:poi|visibility:off&markers=color:red%7C${lat},${lng}`
     : null;
-
+    
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-6xl mx-auto">
@@ -260,6 +289,50 @@ const ProjectView = () => {
                 </div>
               </div>
             </div>
+          <div className="mt-8">
+            <h3 className="text-3xl font-medium mb-4 text-gray-600">Ticket Responses</h3>
+            {responsesLoading ? (
+              <div className="animate-pulse flex flex-col items-center p-4">
+                <div className="h-4 w-24 bg-blue-200 rounded mb-2"></div>
+                <div className="h-4 w-48 bg-blue-200 rounded"></div>
+              </div>
+            ) : responses.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Utility Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[300px]">Response</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[300px]">Description</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {responses.map((response, index) => (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {response.response || ''}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {response.name}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500 max-w-[300px] break-words">
+                          {response.description || response.status || ''}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500 max-w-[300px] break-words">
+                          {response.mbdescription || ''}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center text-gray-500 py-4">
+                No responses available for this ticket.
+              </div>
+            )}
+          </div>
           </CardContent>
         </Card>
       </div>
