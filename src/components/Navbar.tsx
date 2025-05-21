@@ -41,17 +41,6 @@ export function Navbar() {
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
               <button
-                onClick={() => navigate("/tickets")}
-                className={`border-b-2 px-1 pt-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-gray-200 focus:ring-opacity-75 rounded-sm inline-flex items-center ${
-                  isActive("/")
-                    ? "border-orange-500 text-orange-600"
-                    : "border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-900"
-                }`}
-              >
-                <HomeIcon className="h-4 w-4 mr-2" />
-                Home
-              </button>
-              <button
                 onClick={() => navigate("/projects")}
                 className={`border-b-2 px-1 pt-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-gray-200 focus:ring-opacity-75 rounded-sm inline-flex items-center ${
                   isActive("/projects")
@@ -59,8 +48,8 @@ export function Navbar() {
                     : "border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-900"
                 }`}
               >
-                <Folder className="h-4 w-4 mr-2" />
-                Projects
+                <HomeIcon className="h-4 w-4 mr-2" />
+                Home
               </button>
             </div>
           </div>

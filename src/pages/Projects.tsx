@@ -179,12 +179,11 @@ export default function Projects() {
 
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-            <Folder className="h-8 w-8" />
-            Projects
+          <h1 className="text-3xl font-bold text-gray-900">
+            Ticket Dashboard
           </h1>
           <p className="text-gray-600 mt-2">
-            Manage your Blue Stakes projects grouped by location
+            Manage your project's tickets grouped by location
           </p>
         </div>
 
