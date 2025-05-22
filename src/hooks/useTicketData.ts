@@ -26,7 +26,7 @@ export const useTicketData = () => {
           return;
         }
         // Fetch all tickets for the user from Blue Stakes API
-        const ticketsData = await bluestakesService.getAllTickets(user.token);
+        const ticketsData = await bluestakesService.getUserTicketsByMember(user.token);
         console.log("Tickets data from API:", ticketsData);
         setTickets(ticketsData);
         setProjects([]);

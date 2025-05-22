@@ -62,9 +62,9 @@ export const bluestakesService = {
   },
 
   // Fetch tickets for a given member (username) with Authorization token
-  getUserTicketsByMember: async (member, token) => {
+  getUserTicketsByMember: async (token) => {
     const response = await fetch(
-      `${BASE_URL}/reports/tickets/summary/${member}`,
+      `${BASE_URL}/tickets/summary`,
       {
         headers: {
           accept: "application/json",
