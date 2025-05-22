@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useTicketData } from "../hooks/useTicketData";
+import type { Ticket } from "@/types";  // Import Ticket type
 import { Button } from "../components/ui/button";
 import { Navbar } from "../components/Navbar";
 import {
@@ -23,41 +24,10 @@ import { Skeleton } from "../components/ui/skeleton";
 import { Input } from "../components/ui/input";
 import { MapPin, ExternalLink, Search, Folder } from "lucide-react";
 
-// Define a Ticket type that matches the Blue Stakes API response
-interface Ticket {
-  ticket: string;
-  revision: string;
-  completed: string;
-  type: string;
-  priority: string;
-  category: string;
-  lookup: string;
-  channel: string;
-  taken_source: string;
-  taken_version: string;
-  started: string;
-  original_ticket: string;
-  original_date: string;
-  replaced_by_ticket: string;
-  replace_by_date: string;
-  expires: string;
-  reference: string;
-  account: string;
-  original_account: string;
-  caller_type: string;
-  name: string;
-  address1: string;
-  address2: string;
-  city: string;
-  state: string;
-  zip: string;
-  // ... (add more fields as needed)
-}
-
 interface Project {
   id: string;
   name: string;
-  address: string;
+  place: string;
   ticketCount: number;
   activeTickets: number;
   expiredTickets: number;
@@ -82,11 +52,7 @@ export default function Projects() {
     const projectMap = new Map<string, Project>();
     tickets.forEach((ticket) => {
       const address = [
-        ticket.address1?.trim(),
-        ticket.address2?.trim(),
-        ticket.city?.trim(),
-        ticket.state?.trim(),
-        ticket.zip?.trim(),
+        ticket.place?.trim(),
       ]
         .filter((part) => part && part !== "")
         .join(", ")
@@ -96,7 +62,7 @@ export default function Projects() {
         projectMap.set(projectId, {
           id: projectId,
           name: address || "Unknown Address",
-          address: address,
+          place: address,
           ticketCount: 0,
           activeTickets: 0,
           expiredTickets: 0,
@@ -138,8 +104,8 @@ export default function Projects() {
   }, [projects, searchQuery]);
 
   const handleProjectClick = (project: Project) => {
-    // Navigate to tickets page with project address filter
-    navigate(`/tickets?project=${encodeURIComponent(project.address)}`);
+    // Navigate to tickets page with place filter
+    navigate(`/tickets?place=${encodeURIComponent(project.place)}`);
   };
 
   if (loading) {
