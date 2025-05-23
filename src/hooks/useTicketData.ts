@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { bluestakesService } from "@/lib/supabaseService";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Project, Ticket } from "@/types";
+import { useSearchParams } from "react-router-dom";
 
 export const useTicketData = () => {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -13,6 +14,8 @@ export const useTicketData = () => {
   const [showActiveOnly, setShowActiveOnly] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const placeFilter = searchParams.get('place');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -63,7 +66,12 @@ export const useTicketData = () => {
         (ticket.description &&
           ticket.description.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      return activeMatch && searchMatch;
+      // Place filter
+      const placeMatch =
+        !placeFilter ||
+        (ticket.place && ticket.place.toLowerCase() === placeFilter.toLowerCase());
+
+      return activeMatch && searchMatch && placeMatch;
     })
     .sort((a, b) => {
       const dateA = new Date(a.expires).getTime();
