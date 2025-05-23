@@ -1,17 +1,17 @@
 import { useState, useEffect } from "react";
-import { bluestakesService } from "@/lib/supabaseService";
 import { useAuth } from "@/contexts/AuthContext";
-import type { Project, Ticket } from "@/types";
+import { bluestakesService } from "@/lib/bluestakesService";
+import { supabase } from "@/lib/supabaseClient";
+import type { Ticket } from "@/types";
 
 export const useTicketData = () => {
-  const [projects, setProjects] = useState<Project[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
-  const [selectedProject, setSelectedProject] = useState<string>("all");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [showActiveOnly, setShowActiveOnly] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState("expires");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const { user } = useAuth();
 
   useEffect(() => {
@@ -19,17 +19,29 @@ export const useTicketData = () => {
       try {
         setLoading(true);
         setError("");
-        if (!user || !user.token) {
+        if (!user) {
           setTickets([]);
-          setProjects([]);
           setLoading(false);
           return;
         }
-        // Fetch all tickets for the user from Blue Stakes API
-        const ticketsData = await bluestakesService.getAllTickets(user.token);
-        console.log("Tickets data from API:", ticketsData);
-        setTickets(ticketsData);
-        setProjects([]);
+        console.log("Current user:", user);
+        // Fetch project IDs for this user from Supabase
+        const { data: userProjects, error: userProjectsError } = await supabase
+          .from("user_projects")
+          .select("project_id")
+          .eq("user_id", user.id);
+        if (userProjectsError) throw userProjectsError;
+        const userProjectIds = (userProjects || []).map((up) => up.project_id);
+        let allTickets: Ticket[] = [];
+        for (const projectId of userProjectIds) {
+          const projectTickets =
+            await bluestakesService.getTicketsForProject(projectId);
+          console.log("Tickets for project", projectId, projectTickets);
+          if (Array.isArray(projectTickets)) {
+            allTickets = allTickets.concat(projectTickets);
+          }
+        }
+        setTickets(allTickets);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to fetch data");
       } finally {
@@ -38,16 +50,6 @@ export const useTicketData = () => {
     };
     fetchData();
   }, [user]);
-
-  // Filter tickets by project
-  const filterByProject = (projectId: string) => {
-    setSelectedProject(projectId);
-  };
-
-  // Toggle sort direction
-  const toggleSortDirection = () => {
-    setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
-  };
 
   // Filter and sort tickets based on current state
   const filteredAndSortedTickets = tickets
@@ -59,31 +61,31 @@ export const useTicketData = () => {
       // Search filter
       const searchMatch =
         !searchQuery ||
-        ticket.ticket.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        ticket.ticket?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (ticket.description &&
           ticket.description.toLowerCase().includes(searchQuery.toLowerCase()));
 
       return activeMatch && searchMatch;
     })
     .sort((a, b) => {
-      const dateA = new Date(a.expires).getTime();
-      const dateB = new Date(b.expires).getTime();
-      return sortDirection === "asc" ? dateA - dateB : dateB - dateA;
+      if (sortBy === "expires") {
+        const dateA = new Date(a.expires).getTime();
+        const dateB = new Date(b.expires).getTime();
+        return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
+      }
+      // Add more sorting options as needed
+      return 0;
     });
 
   return {
-    projects,
-    tickets,
-    filteredTickets: filteredAndSortedTickets,
+    tickets: filteredAndSortedTickets,
     loading,
     error,
-    selectedProject,
-    sortDirection,
     showActiveOnly,
-    searchQuery,
-    filterByProject,
-    toggleSortDirection,
     setShowActiveOnly,
-    setSearchQuery,
+    sortBy,
+    setSortBy,
+    sortOrder,
+    setSortOrder,
   };
 };

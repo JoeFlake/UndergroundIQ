@@ -41,6 +41,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { Checkbox } from "../components/ui/checkbox";
+import { supabase } from "../lib/supabaseClient";
 
 // Define a Ticket type that matches the Blue Stakes API response
 interface Ticket {
@@ -99,9 +100,32 @@ export default function Tickets() {
   // Get project filter from URL params
   const projectFilter = searchParams.get("project");
 
+  // State for project name
+  const [projectName, setProjectName] = useState<string | null>(null);
+  const [projectNameLoading, setProjectNameLoading] = useState(false);
+
+  useEffect(() => {
+    async function fetchProjectName() {
+      if (!projectFilter) return;
+      setProjectNameLoading(true);
+      const { data, error } = await supabase
+        .from("projects")
+        .select("name")
+        .eq("id", projectFilter)
+        .single();
+      if (error) {
+        setProjectName(null);
+      } else {
+        setProjectName(data?.name || null);
+      }
+      setProjectNameLoading(false);
+    }
+    fetchProjectName();
+  }, [projectFilter]);
+
   // Filter tickets by project if specified
   const filteredTickets = useMemo(() => {
-    let filtered = tickets;
+    let filtered = Array.isArray(tickets) ? tickets : [];
 
     // Apply project filter if specified
     if (projectFilter) {
@@ -229,7 +253,10 @@ export default function Tickets() {
                 Back to Projects
               </Button>
               <h1 className="text-3xl font-bold text-gray-900">
-                Tickets for: {capitalizeWords(projectFilter || "")}
+                Tickets for:{" "}
+                {projectNameLoading
+                  ? "Loading..."
+                  : projectName || projectFilter}
               </h1>
               <p className="text-gray-600 mt-2">
                 Viewing all tickets for this project location

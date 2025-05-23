@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { useTicketData } from "../hooks/useTicketData";
+import { bluestakesService } from "../lib/bluestakesService";
 import { Button } from "../components/ui/button";
 import { Navbar } from "../components/Navbar";
 import {
@@ -44,63 +44,74 @@ import { Checkbox } from "../components/ui/checkbox";
 
 export default function Tickets() {
   const { user } = useAuth();
-  const {
-    tickets,
-    loading,
-    error,
-    showActiveOnly,
-    setShowActiveOnly,
-    sortBy,
-    setSortBy,
-    sortOrder,
-    setSortOrder,
-  } = useTicketData();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
+  const [tickets, setTickets] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>("");
+  const [showActiveOnly, setShowActiveOnly] = useState(true);
+  const [sortBy, setSortBy] = useState("expires");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   // Get project filter from URL params
-  const projectFilter = searchParams.get("project");
+  const projectId = searchParams.get("project");
 
-  // Filter tickets by project if specified
-  const filteredTickets = useMemo(() => {
-    let filtered = tickets;
+  useEffect(() => {
+    const fetchTickets = async () => {
+      try {
+        setLoading(true);
+        setError("");
 
-    // Apply project filter if specified
-    if (projectFilter) {
-      filtered = filtered.filter((ticket) => {
-        const ticketAddress = [
-          ticket.address1?.trim(),
-          ticket.address2?.trim(),
-          ticket.city?.trim(),
-          ticket.state?.trim(),
-          ticket.zip?.trim(),
-        ]
-          .filter(Boolean)
-          .join(", ");
-        return ticketAddress === projectFilter;
-      });
-    }
+        if (!user || !projectId) {
+          setTickets([]);
+          return;
+        }
 
-    // Apply search filter
-    if (searchQuery) {
-      filtered = filtered.filter(
-        (ticket) =>
-          ticket.ticket?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        const ticketsData =
+          await bluestakesService.getTicketsForProject(projectId);
+        setTickets(Array.isArray(ticketsData) ? ticketsData : []);
+      } catch (err) {
+        setTickets([]); // fallback to empty array on error
+        setError(
+          err instanceof Error ? err.message : "Failed to fetch tickets"
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTickets();
+  }, [user, projectId]);
+
+  // Always use a safe array for filtering
+  const safeTickets = Array.isArray(tickets) ? tickets : [];
+  const filteredTickets = safeTickets
+    .filter((ticket) => {
+      // Only filter by active if showActiveOnly is true
+      const activeMatch =
+        !showActiveOnly || new Date(ticket.expires) > new Date();
+
+      // Search filter
+      const searchMatch =
+        !searchQuery ||
+        ticket.ticket?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (ticket.description &&
           ticket.description
-            ?.toLowerCase()
-            .includes(searchQuery.toLowerCase()) ||
-          ticket.address1?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          ticket.comments?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase())) ||
+        ticket.address1?.toLowerCase().includes(searchQuery.toLowerCase());
 
-    return filtered;
-  }, [tickets, projectFilter, searchQuery]);
-
-  const handleTicketClick = (ticket: any) => {
-    navigate(`/project/${ticket.ticket}`);
-  };
+      return activeMatch && searchMatch;
+    })
+    .sort((a, b) => {
+      if (sortBy === "expires") {
+        const dateA = new Date(a.expires).getTime();
+        const dateB = new Date(b.expires).getTime();
+        return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
+      }
+      return 0;
+    });
 
   const handleSort = (field: string) => {
     if (sortBy === field) {
@@ -136,14 +147,19 @@ export default function Tickets() {
       const isActive = new Date(ticket.expires) > new Date();
       return isActive ? "Active" : "Expired";
     }
-    return ticket.status || ticket.type || ticket.revision || "No status";
+    return ticket.status || "No status";
   };
 
-  // Get description from available fields
-  const getDescription = (ticket: any) => {
-    return (
-      ticket.comments || ticket.description || ticket.type || "No description"
-    );
+  // Format address
+  const formatAddress = (ticket: any) => {
+    const parts = [
+      ticket.address1,
+      ticket.address2,
+      ticket.city,
+      ticket.state,
+      ticket.zip,
+    ].filter(Boolean);
+    return parts.join(", ");
   };
 
   if (loading) {
@@ -180,34 +196,20 @@ export default function Tickets() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          {projectFilter ? (
-            <div>
-              <Button
-                variant="ghost"
-                onClick={() => navigate("/")}
-                className="mb-2"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Projects
-              </Button>
-              <h1 className="text-3xl font-bold text-gray-900">
-                Tickets for: {projectFilter}
-              </h1>
-              <p className="text-gray-600 mt-2">
-                Viewing all tickets for this project location
-              </p>
-            </div>
-          ) : (
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">All Tickets</h1>
-              <p className="text-gray-600 mt-2">
-                Manage and view all Blue Stakes tickets
-              </p>
-            </div>
-          )}
+          <Button
+            variant="ghost"
+            onClick={() => navigate("/projects")}
+            className="mb-2"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Projects
+          </Button>
+          <h1 className="text-3xl font-bold text-gray-900">Project Tickets</h1>
+          <p className="text-gray-600 mt-2">
+            View and manage tickets for this project
+          </p>
         </div>
 
         {/* Controls */}
@@ -243,114 +245,36 @@ export default function Tickets() {
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ticket">Ticket Number</SelectItem>
               <SelectItem value="expires">Expiration Date</SelectItem>
-              <SelectItem value="original_date">Original Date</SelectItem>
-              <SelectItem value="replace_by_date">Replace By Date</SelectItem>
+              <SelectItem value="created_at">Created Date</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-
-        {/* Summary Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">
-                Total Tickets
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{filteredTickets.length}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Active</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {
-                  filteredTickets.filter(
-                    (t) => t.expires && new Date(t.expires) > new Date()
-                  ).length
-                }
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Expired</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">
-                {
-                  filteredTickets.filter(
-                    (t) => t.expires && new Date(t.expires) <= new Date()
-                  ).length
-                }
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Tickets Table */}
         <Card>
           <CardHeader>
             <CardTitle>Tickets</CardTitle>
-            <CardDescription>Click on a ticket to view details</CardDescription>
+            <CardDescription>
+              {filteredTickets.length} tickets found
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead
-                    className="cursor-pointer hover:bg-gray-50"
-                    onClick={() => handleSort("ticket")}
-                  >
-                    <div className="flex items-center space-x-1">
-                      <span>Ticket #</span>
-                      {getSortIcon("ticket")}
-                    </div>
-                  </TableHead>
+                  <TableHead>Ticket Number</TableHead>
+                  <TableHead>Address</TableHead>
+                  <TableHead>Description</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead
-                    className="cursor-pointer hover:bg-gray-50"
-                    onClick={() => handleSort("expires")}
-                  >
-                    <div className="flex items-center space-x-1">
-                      <span>Expiration</span>
-                      {getSortIcon("expires")}
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer hover:bg-gray-50"
-                    onClick={() => handleSort("original_date")}
-                  >
-                    <div className="flex items-center space-x-1">
-                      <span>Original Date</span>
-                      {getSortIcon("original_date")}
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer hover:bg-gray-50"
-                    onClick={() => handleSort("replace_by_date")}
-                  >
-                    <div className="flex items-center space-x-1">
-                      <span>Replace By Date</span>
-                      {getSortIcon("replace_by_date")}
-                    </div>
-                  </TableHead>
-                  <TableHead className="hidden md:table-cell">
-                    Description
-                  </TableHead>
-                  <TableHead className="text-right">View</TableHead>
+                  <TableHead>Expires</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredTickets.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={5}
                       className="text-center text-gray-500 py-8"
                     >
                       No tickets found
@@ -358,14 +282,15 @@ export default function Tickets() {
                   </TableRow>
                 ) : (
                   filteredTickets.map((ticket) => (
-                    <TableRow
-                      key={`${ticket.ticket}-${ticket.revision || ""}`}
-                      className="hover:bg-gray-50"
-                      onClick={() => handleTicketClick(ticket)}
-                    >
-                      <TableCell className="font-medium">
-                        #{ticket.ticket || "Unknown"}
+                    <TableRow key={ticket.ticket}>
+                      <TableCell>{ticket.ticket}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-1">
+                          <MapPin className="h-4 w-4 text-gray-400" />
+                          <span>{formatAddress(ticket)}</span>
+                        </div>
                       </TableCell>
+                      <TableCell>{ticket.description}</TableCell>
                       <TableCell>
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -374,36 +299,10 @@ export default function Tickets() {
                               : "bg-red-100 text-red-800"
                           }`}
                         >
-                          <CheckCircle className="w-3 h-3 mr-1" />
                           {getStatus(ticket)}
                         </span>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-1">
-                          <Calendar className="h-4 w-4 text-gray-400" />
-                          <span>{formatDate(ticket.expires)}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-1">
-                          <Calendar className="h-4 w-4 text-gray-400" />
-                          <span>{formatDate(ticket.original_date)}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-1">
-                          <Calendar className="h-4 w-4 text-gray-400" />
-                          <span>{formatDate(ticket.replace_by_date)}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell max-w-xs truncate">
-                        {getDescription(ticket)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm">
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
+                      <TableCell>{formatDate(ticket.expires)}</TableCell>
                     </TableRow>
                   ))
                 )}
