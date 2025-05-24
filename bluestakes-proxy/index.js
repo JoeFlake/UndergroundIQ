@@ -97,6 +97,43 @@ app.post("/api/bluestakes/tickets", async (req, res) => {
   }
 });
 
+app.post("/api/bluestakes/summary", async (req, res) => {
+  const { username, password } = req.body;
+
+  try {
+    // 1. Login to get Bearer token
+    const loginResp = await fetch(
+      "https://newtin-api.bluestakes.org/api/login",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ username, password }).toString(),
+      }
+    );
+    const loginData = await loginResp.json();
+    if (!loginResp.ok || !loginData.Authorization) {
+      return res.status(401).json({ error: "Failed to log in to Blue Stakes" });
+    }
+    const token = loginData.Authorization.replace("Bearer ", "");
+
+    // 2. Call /tickets/summary with Bearer token
+    const summaryResp = await fetch(
+      "https://newtin-api.bluestakes.org/api/tickets/summary",
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      }
+    );
+    const summaryData = await summaryResp.json();
+    res.status(summaryResp.status).json(summaryData);
+  } catch (err) {
+    res.status(500).json({ error: "Proxy error", details: err.message });
+  }
+});
+
 const PORT = 3001;
 app.listen(PORT, () => {
   console.log(`Proxy server running on http://localhost:${PORT}`);

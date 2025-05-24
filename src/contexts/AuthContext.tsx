@@ -1,15 +1,21 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
-// You can type this better if you want
-interface AuthContextType {
-  user: any;
-  loading: boolean;
-  setUser: React.Dispatch<React.SetStateAction<any>>;
-  signOut: () => Promise<void>;
+// Add a User type for Blue Stakes login
+interface BlueStakesUser {
+  username: string;
+  token: string;
 }
 
+type AuthContextType = {
+  user: any;
+  loading: boolean;
+  signOut: () => Promise<void>;
+  setUser: React.Dispatch<React.SetStateAction<any>>;
+};
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
 export { AuthContext };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -44,8 +50,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value: AuthContextType = {
     user,
     loading,
-    setUser,
     signOut,
+    setUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -15,30 +15,16 @@ export const bluestakesService = {
   // Fetch all tickets for the user
   getAllTickets: async (token) => {
     const authHeader = token.startsWith("Bearer ") ? token : "Bearer " + token;
-    let allTickets = [];
-    let offset = 0;
-    const limit = 100;
-    let hasMore = true;
-    while (hasMore) {
-      const response = await fetch(
-        `${BASE_URL}/tickets/search?offset=${offset}&limit=${limit}`,
-        {
-          headers: {
-            accept: "application/json",
-            Authorization: authHeader,
-          },
-        }
-      );
-      const data = await response.json();
-      const tickets = data.data || [];
-      allTickets = allTickets.concat(tickets);
-      if (tickets.length < limit) {
-        hasMore = false;
-      } else {
-        offset += limit;
-      }
-    }
-    return allTickets;
+    console.log("Token being sent to /tickets/search:", token);
+    console.log("Authorization header:", authHeader);
+    const response = await fetch(`${BASE_URL}/tickets/search`, {
+      headers: {
+        accept: "application/json",
+        Authorization: authHeader,
+      },
+    });
+    const data = await response.json();
+    return data.data || [];
   },
 
   // Fetch a ticket by its number
@@ -56,15 +42,12 @@ export const bluestakesService = {
   // Fetch responses for a ticket
   getResponsesByTicket: async (ticketNumber, token) => {
     const authHeader = token.startsWith("Bearer ") ? token : "Bearer " + token;
-    const response = await fetch(
-      `${BASE_URL}/tickets/${ticketNumber}/responses`,
-      {
-        headers: {
-          accept: "application/json",
-          Authorization: authHeader,
-        },
-      }
-    );
+    const response = await fetch(`${BASE_URL}/tickets/${ticketNumber}/responses`, {
+      headers: {
+        accept: "application/json", 
+        Authorization: authHeader,
+      },
+    });
     if (!response.ok) throw new Error("Failed to fetch ticket responses");
     return await response.json();
   },
@@ -79,9 +62,9 @@ export const bluestakesService = {
   },
 
   // Fetch tickets for a given member (username) with Authorization token
-  getUserTicketsByMember: async (member, token) => {
+  getUserTicketsByMember: async (token) => {
     const response = await fetch(
-      `${BASE_URL}/reports/tickets/summary/${member}`,
+      `${BASE_URL}/tickets/summary`,
       {
         headers: {
           accept: "application/json",

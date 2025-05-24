@@ -15,6 +15,7 @@ import ProjectView from "./pages/ProjectView";
 import AdminPanel from "./pages/AdminPanel";
 import Projects from "./pages/Projects";
 import Tickets from "./pages/Index";
+import UnassignedTickets from "./pages/UnassignedTickets";
 
 const queryClient = new QueryClient();
 
@@ -80,6 +81,14 @@ const App = () => (
                 <AdminRoute>
                   <AdminPanel />
                 </AdminRoute>
+              }
+            />
+            <Route
+              path="/unassigned-tickets"
+              element={
+                <ProtectedRoute>
+                  <UnassignedTickets />
+                </ProtectedRoute>
               }
             />
             <Route path="*" element={<NotFound />} />

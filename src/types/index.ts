@@ -31,6 +31,7 @@ export interface Ticket {
   state: string;
   zip: string;
   description: string;
+  place: string;
 }
 
 export interface UserProject {

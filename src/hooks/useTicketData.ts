@@ -24,24 +24,11 @@ export const useTicketData = () => {
           setLoading(false);
           return;
         }
-        console.log("Current user:", user);
-        // Fetch project IDs for this user from Supabase
-        const { data: userProjects, error: userProjectsError } = await supabase
-          .from("user_projects")
-          .select("project_id")
-          .eq("user_id", user.id);
-        if (userProjectsError) throw userProjectsError;
-        const userProjectIds = (userProjects || []).map((up) => up.project_id);
-        let allTickets: Ticket[] = [];
-        for (const projectId of userProjectIds) {
-          const projectTickets =
-            await bluestakesService.getTicketsForProject(projectId);
-          console.log("Tickets for project", projectId, projectTickets);
-          if (Array.isArray(projectTickets)) {
-            allTickets = allTickets.concat(projectTickets);
-          }
-        }
-        setTickets(allTickets);
+        // Fetch all tickets for the user from Blue Stakes API
+        const ticketsData = await bluestakesService.getUserTicketsByMember(user.token);
+        console.log("Tickets data from API:", ticketsData);
+        setTickets(ticketsData);
+        setProjects([]);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to fetch data");
       } finally {

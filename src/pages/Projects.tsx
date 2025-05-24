@@ -21,7 +21,7 @@ import {
 } from "../components/ui/table";
 import { Skeleton } from "../components/ui/skeleton";
 import { Input } from "../components/ui/input";
-import { MapPin, ExternalLink, Search, Folder } from "lucide-react";
+import { MapPin, ExternalLink, Search, Folder, Plus } from "lucide-react";
 
 export default function Projects() {
   const { user } = useAuth();
@@ -29,21 +29,26 @@ export default function Projects() {
   const [searchQuery, setSearchQuery] = useState("");
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
+
+  async function fetchProjects() {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("projects")
+      .select("*, user_projects!inner(user_id)")
+      .eq("user_projects.user_id", user.id);
+    if (error) {
+      setProjects([]);
+    } else {
+      setProjects(data);
+    }
+    setLoading(false);
+  }
 
   useEffect(() => {
-    async function fetchProjects() {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("projects")
-        .select("*, user_projects!inner(user_id)")
-        .eq("user_projects.user_id", user.id);
-      if (error) {
-        setProjects([]);
-      } else {
-        setProjects(data);
-      }
-      setLoading(false);
-    }
     if (user) fetchProjects();
   }, [user]);
 
@@ -55,6 +60,47 @@ export default function Projects() {
 
   const handleProjectClick = (project: any) => {
     navigate(`/tickets?project=${project.id}`);
+  };
+
+  const handleCreateProject = async () => {
+    setCreating(true);
+    setCreateError("");
+    if (!newProjectName.trim()) {
+      setCreateError("Project name is required");
+      setCreating(false);
+      return;
+    }
+    // Insert the new project and get its id
+    const { data, error } = await supabase
+      .from("projects")
+      .insert([{ name: newProjectName.trim(), created_by: user.id }])
+      .select(); // get the inserted project back
+
+    if (error) {
+      setCreateError(error.message);
+      setCreating(false);
+      return;
+    }
+
+    if (data && data.length > 0) {
+      const newProject = data[0];
+      // Assign the current user to the new project
+      const { error: userProjError } = await supabase
+        .from("user_projects")
+        .insert([{ user_id: user.id, project_id: newProject.id }]);
+      if (userProjError) {
+        setCreateError(
+          "Project created, but failed to assign user to project."
+        );
+        setCreating(false);
+        return;
+      }
+    }
+
+    setShowCreateModal(false);
+    setNewProjectName("");
+    setCreating(false);
+    fetchProjects();
   };
 
   if (loading) {
@@ -87,10 +133,41 @@ export default function Projects() {
               Manage your Blue Stakes projects grouped by location
             </p>
           </div>
-          <Button onClick={() => window.location.reload()} className="ml-4">
-            Refresh
+          <Button
+            onClick={() => setShowCreateModal(true)}
+            className="ml-4 flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" /> Create New Project
           </Button>
         </div>
+        {/* Create Project Modal */}
+        {showCreateModal && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30 z-50">
+            <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md">
+              <h2 className="text-xl font-bold mb-4">Create New Project</h2>
+              <Input
+                placeholder="Project Name"
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                className="mb-4"
+              />
+              {createError && (
+                <div className="text-red-500 mb-2">{createError}</div>
+              )}
+              <div className="flex gap-2 justify-end">
+                <Button
+                  onClick={() => setShowCreateModal(false)}
+                  variant="outline"
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleCreateProject} disabled={creating}>
+                  {creating ? "Creating..." : "Create"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Search bar */}
         <div className="mb-6">
           <div className="relative">
