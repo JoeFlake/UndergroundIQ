@@ -82,7 +82,7 @@ function capitalizeWords(str: string) {
 export default function Tickets() {
   const { user } = useAuth();
   const {
-    filteredTickets: tickets,
+    tickets,
     loading,
     error,
     showActiveOnly,

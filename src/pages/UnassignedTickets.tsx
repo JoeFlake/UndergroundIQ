@@ -111,11 +111,14 @@ export default function UnassignedTickets() {
           (assigned || []).map((row: any) => row.ticket_number)
         );
 
-        // 4. Filter out assigned tickets
-        const unassignedTickets = allTickets.filter(
-          (ticket: any) => !assignedTicketNumbers.has(ticket.ticket)
+        // 4. Filter out assigned tickets and only keep active ones
+        const unassignedActiveTickets = allTickets.filter(
+          (ticket: any) =>
+            !assignedTicketNumbers.has(ticket.ticket) &&
+            ticket.expires &&
+            new Date(ticket.expires) > new Date()
         );
-        setTickets(unassignedTickets);
+        setTickets(unassignedActiveTickets);
 
         // 5. Fetch projects for this user
         const { data: userProjects, error: userProjectsError } = await supabase

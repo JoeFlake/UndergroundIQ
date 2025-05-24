@@ -90,8 +90,7 @@ export default function Tickets() {
           ticket.description
             ?.toLowerCase()
             .includes(searchQuery.toLowerCase()) ||
-          ticket.address1?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          ticket.comments?.toLowerCase().includes(searchQuery.toLowerCase())
+          ticket.address1?.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
@@ -230,7 +229,7 @@ export default function Tickets() {
             <Checkbox
               id="show-active-only"
               checked={showActiveOnly}
-              onCheckedChange={setShowActiveOnly}
+              onCheckedChange={(checked) => setShowActiveOnly(checked === true)}
             />
             <label htmlFor="show-active-only" className="text-sm font-medium">
               Show Active Only
