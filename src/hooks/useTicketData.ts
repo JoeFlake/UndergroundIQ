@@ -13,6 +13,8 @@ export const useTicketData = () => {
   const [sortBy, setSortBy] = useState("expires");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const placeFilter = searchParams.get('place');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -52,7 +54,12 @@ export const useTicketData = () => {
         (ticket.description &&
           ticket.description.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      return activeMatch && searchMatch;
+      // Place filter
+      const placeMatch =
+        !placeFilter ||
+        (ticket.place && ticket.place.toLowerCase() === placeFilter.toLowerCase());
+
+      return activeMatch && searchMatch && placeMatch;
     })
     .sort((a, b) => {
       if (sortBy === "expires") {
