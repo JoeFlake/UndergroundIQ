@@ -11,22 +11,24 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, Link } from "react-router-dom";
 import { Eye, EyeOff, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { supabase } from "../lib/supabaseClient";
 
 interface AuthFormProps {
   type: "login" | "signup";
 }
 
 const AuthForm = ({ type }: AuthFormProps) => {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState("user");
+  const [bsUser, setBsUser] = useState("");
+  const [bsPass, setBsPass] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { signIn, signUp, setUser } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -35,44 +37,99 @@ const AuthForm = ({ type }: AuthFormProps) => {
     setLoading(true);
     setError(null);
 
-    try {
-      // Blue Stakes login using form-urlencoded
-      const params = new URLSearchParams();
-      params.append("username", username);
-      params.append("password", password);
+    if (type === "signup") {
+      // 1. Sign up with Supabase Auth only
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+      });
 
-      const response = await fetch(
-        "https://newtin-api.bluestakes.org/api/login",
-        {
-          method: "POST",
-          headers: {
-            accept: "application/json",
-            "Content-Type": "application/x-www-form-urlencoded",
+      if (signUpError) {
+        setError(signUpError.message);
+        setLoading(false);
+        return;
+      }
+
+      // 2. Insert into users table with role and credentials
+      if (data.user) {
+        await supabase.from("users").insert([
+          {
+            id: data.user.id,
+            email,
+            role, // This will be "admin" if selected
+            bluestakes_username: bsUser || null,
+            bluestakes_password: bsPass || null,
           },
-          body: params,
+        ]);
+      }
+
+      toast({
+        title: "Success",
+        description: "Account created! You can now log in.",
+      });
+      navigate("/login");
+      setLoading(false);
+    } else {
+      // LOGIN
+      const { data, error: loginError } =
+        await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+      if (loginError) {
+        setError(loginError.message);
+        setLoading(false);
+        return;
+      }
+
+      const userId = data.user.id;
+
+      // Check if user exists in users table
+      let { data: userMeta, error: metaError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", userId)
+        .single();
+
+      if (!userMeta) {
+        // Insert user into users table
+        const { error: dbError } = await supabase.from("users").insert([
+          {
+            id: userId,
+            email,
+            role, // Default to 'user' or use selected role
+            bluestakes_username: role === "admin" ? bsUser : null,
+            bluestakes_password: role === "admin" ? bsPass : null,
+          },
+        ]);
+        if (dbError) {
+          setError("Login succeeded, but failed to create user profile.");
+          setLoading(false);
+          return;
         }
-      );
-      const data = await response.json();
-      if (response.ok && data.Authorization) {
-        setUser({ username, token: data.Authorization });
+        // Fetch the newly created userMeta
+        ({ data: userMeta, error: metaError } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", userId)
+          .single());
+      }
+
+      if (metaError) {
+        setError("Login succeeded, but failed to fetch user metadata.");
+      } else {
         toast({
           title: "Success",
-          description: "You've been logged in via Blue Stakes.",
+          description: "Logged in successfully!",
         });
         navigate("/");
-      } else {
-        setError(data.message || "Login failed");
       }
-    } catch (error) {
-      setError("An unexpected error occurred");
-    } finally {
       setLoading(false);
     }
   };
 
-  const toggleShowPassword = () => {
-    setShowPassword(!showPassword);
-  };
+  const toggleShowPassword = () => setShowPassword(!showPassword);
 
   return (
     <Card className="w-full max-w-md mx-auto animate-fade-in">
@@ -83,7 +140,7 @@ const AuthForm = ({ type }: AuthFormProps) => {
         <CardDescription>
           {type === "login"
             ? "Enter your email and password to sign in"
-            : "Enter your email and password to create an account"}
+            : "Enter your email, password, and role to create an account"}
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
@@ -96,15 +153,14 @@ const AuthForm = ({ type }: AuthFormProps) => {
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="username">Username</Label>
+            <Label htmlFor="email">Email</Label>
             <Input
-              id="username"
-              type="text"
-              placeholder="Enter your Blue Stakes username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              id="email"
+              type="email"
+              placeholder="Enter your email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
-              className="transition-all duration-200 focus:ring-2 focus:ring-gray-900 focus:border-transparent"
             />
           </div>
 
@@ -114,11 +170,11 @@ const AuthForm = ({ type }: AuthFormProps) => {
               <Input
                 id="password"
                 type={showPassword ? "text" : "password"}
-                placeholder="Enter your Blue Stakes password"
+                placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="transition-all duration-200 focus:ring-2 focus:ring-gray-900 focus:border-transparent pr-10"
+                className="pr-10"
               />
               <button
                 type="button"
@@ -133,6 +189,51 @@ const AuthForm = ({ type }: AuthFormProps) => {
               </button>
             </div>
           </div>
+
+          {(type === "signup" || role === "admin") && (
+            <>
+              {type === "signup" && (
+                <div className="space-y-2">
+                  <Label htmlFor="role">Role</Label>
+                  <select
+                    id="role"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    className="w-full border rounded px-2 py-2"
+                  >
+                    <option value="admin">Admin</option>
+                    <option value="user">User</option>
+                  </select>
+                </div>
+              )}
+              {role === "admin" && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="bsUser">Blue Stakes Username</Label>
+                    <Input
+                      id="bsUser"
+                      type="text"
+                      placeholder="Enter your Blue Stakes username"
+                      value={bsUser}
+                      onChange={(e) => setBsUser(e.target.value)}
+                      required={role === "admin"}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="bsPass">Blue Stakes Password</Label>
+                    <Input
+                      id="bsPass"
+                      type="password"
+                      placeholder="Enter your Blue Stakes password"
+                      value={bsPass}
+                      onChange={(e) => setBsPass(e.target.value)}
+                      required={role === "admin"}
+                    />
+                  </div>
+                </>
+              )}
+            </>
+          )}
         </CardContent>
 
         <CardFooter className="flex flex-col">

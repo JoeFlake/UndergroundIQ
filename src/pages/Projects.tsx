@@ -1,8 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { useTicketData } from "../hooks/useTicketData";
-import type { Ticket } from "@/types";  // Import Ticket type
+import { supabase } from "../lib/supabaseClient";
 import { Button } from "../components/ui/button";
 import { Navbar } from "../components/Navbar";
 import {
@@ -22,90 +21,86 @@ import {
 } from "../components/ui/table";
 import { Skeleton } from "../components/ui/skeleton";
 import { Input } from "../components/ui/input";
-import { MapPin, ExternalLink, Search, Folder } from "lucide-react";
-
-interface Project {
-  id: string;
-  name: string;
-  place: string;
-  ticketCount: number;
-  activeTickets: number;
-  expiredTickets: number;
-  latestTicket?: Ticket;
-  tickets: Ticket[];
-}
-
-// Utility function to capitalize each word in a string
-function capitalizeWords(str: string) {
-  return str.replace(/\b\w/g, (char) => char.toUpperCase());
-}
+import { MapPin, ExternalLink, Search, Folder, Plus } from "lucide-react";
 
 export default function Projects() {
   const { user } = useAuth();
-  const { tickets, loading, error } = useTicketData();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
+  const [projects, setProjects] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
 
-  // Group tickets by address to create projects
-  const projects = useMemo(() => {
-    if (!tickets.length) return [];
-    const projectMap = new Map<string, Project>();
-    tickets.forEach((ticket) => {
-      const address = [
-        ticket.place?.trim(),
-      ]
-        .filter((part) => part && part !== "")
-        .join(", ")
-        .toLowerCase();
-      const projectId = address || `unknown-${ticket.ticket}`;
-      if (!projectMap.has(projectId)) {
-        projectMap.set(projectId, {
-          id: projectId,
-          name: address || "Unknown Address",
-          place: address,
-          ticketCount: 0,
-          activeTickets: 0,
-          expiredTickets: 0,
-          tickets: [],
-        });
+  async function fetchProjects() {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("projects")
+      .select("*, user_projects!inner(user_id)")
+      .eq("user_projects.user_id", user.id);
+    if (error) {
+      setProjects([]);
+    } else {
+      setProjects(data);
+    }
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    if (user) fetchProjects();
+  }, [user]);
+
+  const filteredProjects = projects.filter(
+    (project) =>
+      !searchQuery ||
+      project.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleProjectClick = (project: any) => {
+    navigate(`/tickets?project=${project.id}`);
+  };
+
+  const handleCreateProject = async () => {
+    setCreating(true);
+    setCreateError("");
+    if (!newProjectName.trim()) {
+      setCreateError("Project name is required");
+      setCreating(false);
+      return;
+    }
+    // Insert the new project and get its id
+    const { data, error } = await supabase
+      .from("projects")
+      .insert([{ name: newProjectName.trim(), created_by: user.id }])
+      .select(); // get the inserted project back
+
+    if (error) {
+      setCreateError(error.message);
+      setCreating(false);
+      return;
+    }
+
+    if (data && data.length > 0) {
+      const newProject = data[0];
+      // Assign the current user to the new project
+      const { error: userProjError } = await supabase
+        .from("user_projects")
+        .insert([{ user_id: user.id, project_id: newProject.id }]);
+      if (userProjError) {
+        setCreateError(
+          "Project created, but failed to assign user to project."
+        );
+        setCreating(false);
+        return;
       }
-      const project = projectMap.get(projectId)!;
-      project.tickets.push(ticket);
-      project.ticketCount++;
-      const isActive = ticket.expires && new Date(ticket.expires) > new Date();
-      if (isActive) {
-        project.activeTickets++;
-      } else {
-        project.expiredTickets++;
-      }
-      if (
-        !project.latestTicket ||
-        (ticket.expires && ticket.expires > project.latestTicket.expires)
-      ) {
-        project.latestTicket = ticket;
-      }
-    });
-    return Array.from(projectMap.values()).sort(
-      (a, b) => b.ticketCount - a.ticketCount
-    );
-  }, [tickets]);
+    }
 
-  // Filter projects based on search query
-  const filteredProjects = useMemo(() => {
-    if (!searchQuery) return projects;
-
-    return projects.filter(
-      (project) =>
-        project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        project.tickets.some((ticket) =>
-          ticket.ticket?.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-    );
-  }, [projects, searchQuery]);
-
-  const handleProjectClick = (project: Project) => {
-    // Navigate to tickets page with place filter
-    navigate(`/tickets?place=${encodeURIComponent(project.place)}`);
+    setShowCreateModal(false);
+    setNewProjectName("");
+    setCreating(false);
+    fetchProjects();
   };
 
   if (loading) {
@@ -124,88 +119,67 @@ export default function Projects() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Navbar />
-        <div className="container mx-auto px-4 py-8">
-          <Card>
-            <CardContent className="p-8 text-center">
-              <p className="text-red-500 text-lg">{error}</p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Ticket Dashboard
-          </h1>
-          <p className="text-gray-600 mt-2">
-            Manage your project's tickets grouped by location
-          </p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+              <Folder className="h-8 w-8" />
+              Projects
+            </h1>
+            <p className="text-gray-600 mt-2">
+              Manage your Blue Stakes projects grouped by location
+            </p>
+          </div>
+          <Button
+            onClick={() => setShowCreateModal(true)}
+            className="ml-4 flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" /> Create New Project
+          </Button>
         </div>
-
+        {/* Create Project Modal */}
+        {showCreateModal && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30 z-50">
+            <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md">
+              <h2 className="text-xl font-bold mb-4">Create New Project</h2>
+              <Input
+                placeholder="Project Name"
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                className="mb-4"
+              />
+              {createError && (
+                <div className="text-red-500 mb-2">{createError}</div>
+              )}
+              <div className="flex gap-2 justify-end">
+                <Button
+                  onClick={() => setShowCreateModal(false)}
+                  variant="outline"
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleCreateProject} disabled={creating}>
+                  {creating ? "Creating..." : "Create"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Search bar */}
         <div className="mb-6">
           <div className="relative">
             <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
             <Input
-              placeholder="Search projects by address or ticket number..."
+              placeholder="Search projects by name..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
             />
           </div>
         </div>
-
-        {/* Summary stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">
-                Total Projects
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {filteredProjects.length}
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">
-                Total Tickets
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {filteredProjects.reduce((sum, p) => sum + p.ticketCount, 0)}
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">
-                Active Tickets
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {filteredProjects.reduce((sum, p) => sum + p.activeTickets, 0)}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
         {/* Projects table */}
         <Card>
           <CardHeader>
@@ -218,19 +192,15 @@ export default function Projects() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Project Address</TableHead>
-                  <TableHead>Total Tickets</TableHead>
-                  <TableHead>Active</TableHead>
-                  <TableHead>Expired</TableHead>
-                  <TableHead>Latest Ticket</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
+                  <TableHead>Project Name</TableHead>
+                  <TableHead>Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredProjects.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={2}
                       className="text-center text-gray-500 py-8"
                     >
                       No projects found
@@ -248,44 +218,10 @@ export default function Projects() {
                           <MapPin className="h-4 w-4 text-gray-400" />
                           <div>
                             <div className="font-medium">
-                              {capitalizeWords(project.name) ||
-                                "Unknown Address"}
+                              {project.name || "Unknown Project"}
                             </div>
                           </div>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          {project.ticketCount}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          {project.activeTickets}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          {project.expiredTickets}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        {project.latestTicket ? (
-                          <div className="text-sm">
-                            <div className="font-medium">
-                              #{project.latestTicket.ticket}
-                            </div>
-                            <div className="text-gray-500">
-                              {project.latestTicket.expires
-                                ? new Date(
-                                    project.latestTicket.expires
-                                  ).toLocaleDateString()
-                                : "-"}
-                            </div>
-                          </div>
-                        ) : (
-                          "-"
-                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="sm">
