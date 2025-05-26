@@ -18,6 +18,8 @@ import {
 import { Skeleton } from "../components/ui/skeleton";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { useAuth } from "../contexts/AuthContext";
+import type { Ticket, Project } from "../types";
 
 function formatDate(dateString: string | undefined) {
   if (!dateString) return "-";
@@ -28,14 +30,14 @@ function formatDate(dateString: string | undefined) {
   }
 }
 
-function getStatus(ticket: any) {
+function getStatus(ticket: Ticket) {
   if (!ticket.expires) return "Unknown";
   const now = new Date();
   const expires = new Date(ticket.expires);
   return expires > now ? "Active" : "Expired";
 }
 
-function formatAddress(ticket: any) {
+function formatAddress(ticket: Ticket) {
   // Build a more descriptive address using the provided fields
   const parts = [
     ticket.place,
@@ -56,12 +58,23 @@ function formatAddress(ticket: any) {
   return parts.join(", ");
 }
 
+// Add a type guard for error with message
+function isErrorWithMessage(err: unknown): err is { message: string } {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "message" in err &&
+    typeof (err as { message: unknown }).message === "string"
+  );
+}
+
 export default function UnassignedTickets() {
-  const [tickets, setTickets] = useState<any[]>([]);
+  const { user } = useAuth();
+  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
-  const [projects, setProjects] = useState<any[]>([]);
-  const [assigningTicket, setAssigningTicket] = useState<any | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [assigningTicket, setAssigningTicket] = useState<Ticket | null>(null);
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState("");
@@ -73,71 +86,130 @@ export default function UnassignedTickets() {
       setError("");
       try {
         // 1. Get Blue Stakes credentials for the current user
-        const { data: user, error: userError } = await supabase
+        const {
+          data: userProfile,
+          error: userError,
+        }: {
+          data: {
+            bluestakes_username: string;
+            bluestakes_password: string;
+            id: string;
+          } | null;
+          error: unknown;
+        } = await supabase
           .from("users")
           .select("bluestakes_username, bluestakes_password, id")
+          .eq("id", user.id)
           .single();
         if (userError) throw userError;
-        if (!user?.bluestakes_username || !user?.bluestakes_password) {
+        if (
+          !userProfile?.bluestakes_username ||
+          !userProfile?.bluestakes_password
+        ) {
           throw new Error("Blue Stakes credentials not found");
         }
 
-        // 2. Call the proxy to get tickets from /tickets/summary
-        const response = await fetch(
-          "http://localhost:3001/api/bluestakes/summary",
+        // 2. Log in to Blue Stakes API to get Bearer token
+        const loginResp = await fetch(
+          "https://newtin-api.bluestakes.org/api/login",
           {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              username: user.bluestakes_username,
-              password: user.bluestakes_password,
-            }),
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              username: userProfile.bluestakes_username,
+              password: userProfile.bluestakes_password,
+            }).toString(),
           }
         );
-        if (!response.ok) {
-          throw new Error("Failed to fetch tickets from Blue Stakes proxy");
+        const loginData = await loginResp.json();
+        if (!loginResp.ok || !loginData.Authorization) {
+          throw new Error("Failed to log in to Blue Stakes");
         }
-        const responseData = await response.json();
-        const allTickets = Array.isArray(responseData)
+        const bearerToken = loginData.Authorization.replace("Bearer ", "");
+
+        // 3. Fetch tickets/summary with Bearer token
+        const summaryResp = await fetch(
+          "https://newtin-api.bluestakes.org/api/tickets/summary",
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${bearerToken}`,
+              Accept: "application/json",
+            },
+          }
+        );
+        const responseData = await summaryResp.json();
+        const allTickets: Ticket[] = Array.isArray(responseData)
           ? responseData
           : responseData.data || [];
 
-        // 3. Fetch all assigned ticket numbers from project_tickets
-        const { data: assigned, error: assignedError } = await supabase
-          .from("project_tickets")
-          .select("ticket_number");
+        // 4. Fetch all assigned ticket numbers from project_tickets
+        const {
+          data: assigned,
+          error: assignedError,
+        }: { data: { ticket_number: string }[] | null; error: unknown } =
+          await supabase.from("project_tickets").select("ticket_number");
         if (assignedError) throw assignedError;
         const assignedTicketNumbers = new Set(
-          (assigned || []).map((row: any) => row.ticket_number)
+          (assigned || []).map((row) => row.ticket_number)
         );
 
-        // 4. Filter out assigned tickets and only keep active ones
+        // 5. Filter out assigned tickets and only keep active ones
+        const now = new Date();
         const unassignedActiveTickets = allTickets.filter(
-          (ticket: any) =>
+          (ticket) =>
             !assignedTicketNumbers.has(ticket.ticket) &&
             ticket.expires &&
-            new Date(ticket.expires) > new Date()
+            new Date(ticket.expires) > now
         );
         setTickets(unassignedActiveTickets);
 
-        // 5. Fetch projects for this user
-        const { data: userProjects, error: userProjectsError } = await supabase
+        // 6. Fetch projects for this user
+        const {
+          data: userProjects,
+          error: userProjectsError,
+        }: {
+          data:
+            | {
+                projects:
+                  | { id: number; name: string }
+                  | { id: number; name: string }[]
+                  | null;
+              }[]
+            | null;
+          error: unknown;
+        } = await supabase
           .from("user_projects")
           .select("project_id, projects(id, name)")
           .eq("user_id", user.id);
         if (userProjectsError) throw userProjectsError;
-        setProjects(userProjects.map((up: any) => up.projects));
-      } catch (err: any) {
-        setError(err.message || "Failed to fetch tickets");
+        setProjects(
+          (userProjects || [])
+            .map((up) => {
+              if (Array.isArray(up.projects)) {
+                return up.projects[0];
+              }
+              return up.projects;
+            })
+            .filter((proj) => proj && proj.id && proj.name)
+            .map((proj) => ({
+              project_id: proj.id,
+              project_name: proj.name,
+            }))
+        );
+      } catch (err: unknown) {
+        setError(
+          isErrorWithMessage(err) ? err.message : "Failed to fetch tickets"
+        );
       } finally {
         setLoading(false);
       }
     };
 
-    fetchAllTickets();
-  }, []);
+    if (user) fetchAllTickets();
+  }, [user]);
 
-  const openAssignModal = (ticket: any) => {
+  const openAssignModal = (ticket: Ticket) => {
     setAssigningTicket(ticket);
     setSelectedProject("");
     setAssignError("");
@@ -178,8 +250,10 @@ export default function UnassignedTickets() {
           closeAssignModal();
         }, 1000);
       }
-    } catch (err: any) {
-      setAssignError(err.message || "Failed to assign ticket");
+    } catch (err: unknown) {
+      setAssignError(
+        isErrorWithMessage(err) ? err.message : "Failed to assign ticket"
+      );
     } finally {
       setAssigning(false);
     }
@@ -301,8 +375,8 @@ export default function UnassignedTickets() {
                 >
                   <option value="">-- Select a project --</option>
                   {projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.name}
+                    <option key={project.project_id} value={project.project_id}>
+                      {project.project_name}
                     </option>
                   ))}
                 </select>

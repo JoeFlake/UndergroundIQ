@@ -14,7 +14,7 @@ import NotFound from "./pages/NotFound";
 import ProjectView from "./pages/TicketView";
 import AdminPanel from "./pages/AdminPanel";
 import Projects from "./pages/Projects";
-import Tickets from "./pages/Index";
+import Tickets from "./pages/Tickets";
 import UnassignedTickets from "./pages/UnassignedTickets";
 
 const queryClient = new QueryClient();

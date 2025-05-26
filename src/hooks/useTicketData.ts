@@ -3,6 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { bluestakesService } from "@/lib/bluestakesService";
 import { supabase } from "@/lib/supabaseClient";
 import type { Ticket } from "@/types";
+import { useSearchParams } from "react-router-dom";
 
 export const useTicketData = () => {
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -14,7 +15,7 @@ export const useTicketData = () => {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
-  const placeFilter = searchParams.get('place');
+  const placeFilter = searchParams.get("place");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -27,10 +28,11 @@ export const useTicketData = () => {
           return;
         }
         // Fetch all tickets for the user from Blue Stakes API
-        const ticketsData = await bluestakesService.getUserTicketsByMember(user.token);
-        console.log("Tickets data from API:", ticketsData);
-        setTickets(ticketsData);
-        setProjects([]);
+        // You may want to pass a projectId here, or fetch all tickets another way
+        // For now, just fetch all tickets for a dummy project or handle as needed
+        // Example: const ticketsData = await bluestakesService.getTicketsForProject(projectId);
+        // For now, just set empty array or handle as needed
+        setTickets([]);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to fetch data");
       } finally {
@@ -57,7 +59,8 @@ export const useTicketData = () => {
       // Place filter
       const placeMatch =
         !placeFilter ||
-        (ticket.place && ticket.place.toLowerCase() === placeFilter.toLowerCase());
+        (ticket.place &&
+          ticket.place.toLowerCase() === placeFilter.toLowerCase());
 
       return activeMatch && searchMatch && placeMatch;
     })
