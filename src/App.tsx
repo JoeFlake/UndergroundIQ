@@ -11,7 +11,7 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
-import ProjectView from "./pages/TicketView";
+import TicketView from "./pages/TicketView";
 import AdminPanel from "./pages/AdminPanel";
 import Projects from "./pages/Projects";
 import Tickets from "./pages/Tickets";
@@ -52,10 +52,10 @@ const App = () => (
               }
             />
             <Route
-              path="/project/:ticketId"
+              path="/tickets/:ticketId"
               element={
                 <ProtectedRoute>
-                  <ProjectView />
+                  <TicketView />
                 </ProtectedRoute>
               }
             />

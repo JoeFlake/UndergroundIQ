@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { /*supabaseService, */bluestakesService } from "@/lib/supabaseService";
+import { bluestakesService } from "@/lib/supabaseService";
 import { Ticket, Project, UserProject } from "@/types";
 import { ArrowLeft, Calendar, ExternalLink, MapPin, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useBluestakesAuth } from "@/hooks/useBluestakesAuth";
 
 const TicketView = () => {
   const { ticketId } = useParams();
@@ -17,15 +18,16 @@ const TicketView = () => {
   const [loading, setLoading] = useState(true);
   const [responsesLoading, setResponsesLoading] = useState(true);
   const { user } = useAuth();
+  const { bluestakesToken, isLoading: authLoading, error: authError } = useBluestakesAuth();
 
   useEffect(() => {
     const fetchTicketData = async () => {
-      if (!ticketId || !user || !user.token) return;
+      if (!ticketId || !bluestakesToken) return;
       try {
         setLoading(true);
         const ticket = await bluestakesService.getTicketByNumber(
           ticketId,
-          user.token
+          bluestakesToken
         );
         setCurrentTicket(ticket);
       } catch (error) {
@@ -35,12 +37,12 @@ const TicketView = () => {
       }
     };
     fetchTicketData();
-  }, [ticketId, user]);
+  }, [ticketId, bluestakesToken]);
 
   useEffect(() => {
     const fetchResponses = async () => {
-      if (!ticketId || !user || !user.token) {
-        console.log('Missing required data:', { ticketId, hasUser: !!user, hasToken: !!user?.token });
+      if (!ticketId || !bluestakesToken) {
+        console.log('Missing required data:', { ticketId, hasToken: !!bluestakesToken });
         return;
       }
       try {
@@ -48,7 +50,7 @@ const TicketView = () => {
         console.log('Fetching responses for ticket:', ticketId);
         const responsesData = await bluestakesService.getResponsesByTicket(
           ticketId,
-          user.token
+          bluestakesToken
         );
         console.log('Received responses data:', responsesData);
         // Check if responses is nested in the data
@@ -62,7 +64,7 @@ const TicketView = () => {
       }
     };
     fetchResponses();
-  }, [ticketId, user]);
+  }, [ticketId, bluestakesToken]);
 
   const handleBack = () => {
     if (projectId) {
@@ -71,6 +73,43 @@ const TicketView = () => {
       navigate("/");
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="h-12 w-12 rounded-full bg-blue-200"></div>
+          <div className="mt-4 h-4 w-24 bg-blue-200 rounded"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (authError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-center text-red-500">
+              Authentication Error
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-center">
+            <div className="flex flex-col items-center justify-center h-full">
+              <h2 className="text-2xl font-semibold mb-2">Authentication Error</h2>
+              <p className="text-muted-foreground">
+                {authError}
+              </p>
+            </div>
+            <Button onClick={handleBack}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

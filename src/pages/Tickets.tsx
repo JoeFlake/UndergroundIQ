@@ -19,6 +19,7 @@ import {
 import { Skeleton } from "../components/ui/skeleton";
 import { Button } from "../components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
+import { useBluestakesAuth } from "@/hooks/useBluestakesAuth";
 import type { Ticket } from "../types";
 
 function getStatus(ticket: Ticket) {
@@ -59,6 +60,7 @@ function isErrorWithMessage(err: unknown): err is { message: string } {
 
 export default function Tickets() {
   const { user } = useAuth();
+  const { bluestakesToken, isLoading: authLoading, error: authError } = useBluestakesAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -69,6 +71,12 @@ export default function Tickets() {
 
   useEffect(() => {
     async function fetchTickets() {
+      if (!bluestakesToken) {
+        setTickets([]);
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError("");
       try {
@@ -79,45 +87,13 @@ export default function Tickets() {
           return;
         }
 
-        // 1. Get Blue Stakes credentials for the current user
-        const { data: userProfile, error: userError } = await supabase
-          .from("users")
-          .select("bluestakes_username, bluestakes_password")
-          .eq("id", user.id)
-          .single();
-        if (userError) throw userError;
-        if (
-          !userProfile?.bluestakes_username ||
-          !userProfile?.bluestakes_password
-        ) {
-          throw new Error("Blue Stakes credentials not found");
-        }
-
-        // 2. Log in to Blue Stakes API to get Bearer token
-        const loginResp = await fetch(
-          "https://newtin-api.bluestakes.org/api/login",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({
-              username: userProfile.bluestakes_username,
-              password: userProfile.bluestakes_password,
-            }).toString(),
-          }
-        );
-        const loginData = await loginResp.json();
-        if (!loginResp.ok || !loginData.Authorization) {
-          throw new Error("Failed to log in to Blue Stakes");
-        }
-        const bearerToken = loginData.Authorization.replace("Bearer ", "");
-
-        // 3. Fetch tickets/summary with Bearer token
+        // Fetch tickets/summary with Bearer token
         const summaryResp = await fetch(
           "https://newtin-api.bluestakes.org/api/tickets/summary",
           {
             method: "GET",
             headers: {
-              Authorization: `Bearer ${bearerToken}`,
+              Authorization: `Bearer ${bluestakesToken}`,
               Accept: "application/json",
             },
           }
@@ -127,14 +103,14 @@ export default function Tickets() {
           ? responseData
           : responseData.data || [];
 
-        // 4. Fetch assigned ticket numbers for this project
+        // Fetch assigned ticket numbers for this project
         const { data: assigned, error: assignedError } = await supabase
           .from("project_tickets")
           .select("ticket_number")
           .eq("project_id", projectId);
         if (assignedError) throw assignedError;
 
-        // 5. Filter tickets to only those assigned to this project
+        // Filter tickets to only those assigned to this project
         const assignedTicketNumbers = new Set(
           (assigned || []).map((row) => row.ticket_number)
         );
@@ -152,7 +128,7 @@ export default function Tickets() {
       }
     }
     if (user) fetchTickets();
-  }, [user, searchParams]);
+  }, [user, searchParams, bluestakesToken]);
 
   useEffect(() => {
     const projectId = Number(searchParams.get("project"));
@@ -184,7 +160,11 @@ export default function Tickets() {
             <CardTitle>Tickets for {projectName || "Project"}</CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {authLoading ? (
+              <Skeleton className="h-20 w-full" />
+            ) : authError ? (
+              <div className="text-red-500">{authError}</div>
+            ) : loading ? (
               <Skeleton className="h-20 w-full" />
             ) : error ? (
               <div className="text-red-500">{error}</div>
