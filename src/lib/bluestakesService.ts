@@ -12,7 +12,34 @@ interface BlueStakesTicket {
   zip: string;
 }
 
+const BASE_URL = "https://newtiny-api.bluestakes.org/api";
+
 export const bluestakesService = {
+  async getAllTickets(token: string) {
+    try {
+      const response = await fetch(
+        `${BASE_URL}/tickets/summary`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch tickets from Blue Stakes");
+      }
+
+      const responseData = await response.json();
+      return Array.isArray(responseData) ? responseData : responseData.data || [];
+    } catch (error) {
+      console.error("Error fetching all tickets:", error);
+      throw error;
+    }
+  },
+
   async getTicketsForProject(projectId: string) {
     try {
       // First, get the project addresses
