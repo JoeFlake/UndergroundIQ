@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { /*supabaseService, */bluestakesService } from "@/lib/supabaseService";
@@ -8,10 +8,8 @@ import { ArrowLeft, Calendar, ExternalLink, MapPin, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 const ProjectView = () => {
-  const { id } = useParams();
+  const { ticketId } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const place = searchParams.get('place');
   const [currentTicket, setCurrentTicket] = useState(null);
   const [responses, setResponses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,11 +18,11 @@ const ProjectView = () => {
 
   useEffect(() => {
     const fetchTicketData = async () => {
-      if (!id || !user || !user.token) return;
+      if (!ticketId || !user || !user.token) return;
       try {
         setLoading(true);
         const ticket = await bluestakesService.getTicketByNumber(
-          id,
+          ticketId,
           user.token
         );
         setCurrentTicket(ticket);
@@ -35,19 +33,19 @@ const ProjectView = () => {
       }
     };
     fetchTicketData();
-  }, [id, user]);
+  }, [ticketId, user]);
 
   useEffect(() => {
     const fetchResponses = async () => {
-      if (!id || !user || !user.token) {
-        console.log('Missing required data:', { id, hasUser: !!user, hasToken: !!user?.token });
+      if (!ticketId || !user || !user.token) {
+        console.log('Missing required data:', { ticketId, hasUser: !!user, hasToken: !!user?.token });
         return;
       }
       try {
         setResponsesLoading(true);
-        console.log('Fetching responses for ticket:', id);
+        console.log('Fetching responses for ticket:', ticketId);
         const responsesData = await bluestakesService.getResponsesByTicket(
-          id,
+          ticketId,
           user.token
         );
         console.log('Received responses data:', responsesData);
@@ -62,14 +60,10 @@ const ProjectView = () => {
       }
     };
     fetchResponses();
-  }, [id, user]);
+  }, [ticketId, user]);
 
   const handleBack = () => {
-    if (place) {
-      navigate(`/tickets?place=${encodeURIComponent(place)}`);
-    } else {
-      navigate("/");
-    }
+    navigate("/");
   };
 
   if (loading) {
@@ -174,7 +168,7 @@ const ProjectView = () => {
       <div className="max-w-6xl mx-auto">
         <Button variant="ghost" onClick={handleBack} className="mb-4">
           <ArrowLeft className="mr-2 h-4 w-4" />
-          {place ? `Back to ${place}` : 'Back to Dashboard'}
+          Back to Dashboard
         </Button>
 
         <Card className="mb-8 animate-fade-in">

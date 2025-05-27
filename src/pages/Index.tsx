@@ -71,7 +71,6 @@ interface Ticket {
   state: string;
   zip: string;
   description: string;
-  place: string;
   // ... (add more fields as needed)
 }
 
@@ -137,7 +136,7 @@ export default function Tickets() {
   }, [tickets, projectFilter, searchQuery]);
 
   const handleTicketClick = (ticket: Ticket) => {
-    navigate(`/tickets/${ticket.ticket}?place=${encodeURIComponent(ticket.place)}`);
+    navigate(`/project/${ticket.ticket}`);
   };
 
   const handleSort = (field: string) => {
@@ -286,7 +285,7 @@ export default function Tickets() {
                 <SelectItem value="ticket">Ticket Number</SelectItem>
                 <SelectItem value="expires">Expiration Date</SelectItem>
                 <SelectItem value="original_date">Original Date</SelectItem>
-                <SelectItem value="replace_by_date">Update Date</SelectItem>
+                <SelectItem value="replace_by_date">Replace By Date</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -377,7 +376,7 @@ export default function Tickets() {
                     onClick={() => handleSort("replace_by_date")}
                   >
                     <div className="flex items-center space-x-1">
-                      <span>Update Date</span>
+                      <span>Replace By Date</span>
                       {getSortIcon("replace_by_date")}
                     </div>
                   </TableHead>

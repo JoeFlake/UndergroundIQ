@@ -52,7 +52,7 @@ const App = () => (
               }
             />
             <Route
-              path="/tickets/:id"
+              path="/project/:ticketId"
               element={
                 <ProtectedRoute>
                   <ProjectView />
