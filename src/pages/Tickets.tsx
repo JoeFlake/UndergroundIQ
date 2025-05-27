@@ -22,6 +22,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useBluestakesAuth } from "@/hooks/useBluestakesAuth";
 import { bluestakesService } from "@/lib/bluestakesService";
 import type { Ticket } from "../types";
+import { ArrowLeft } from "lucide-react";
 
 function getStatus(ticket: Ticket) {
   if (!ticket.expires) return "Unknown";
@@ -178,6 +179,10 @@ export default function Tickets() {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       <div className="container mx-auto px-4 py-8">
+      <Button variant="ghost" onClick={() => navigate("/")} className="mb-4">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Dashboard
+        </Button>
         <Card>
           <CardHeader>
             <CardTitle>Tickets for {projectName || "Project"}</CardTitle>

@@ -7,6 +7,7 @@ import { Ticket, Project, UserProject } from "@/types";
 import { ArrowLeft, Calendar, ExternalLink, MapPin, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBluestakesAuth } from "@/hooks/useBluestakesAuth";
+import { supabase } from "@/lib/supabaseClient";
 
 const TicketView = () => {
   const { ticketId } = useParams();
@@ -19,6 +20,7 @@ const TicketView = () => {
   const [responsesLoading, setResponsesLoading] = useState(true);
   const { user } = useAuth();
   const { bluestakesToken, isLoading: authLoading, error: authError } = useBluestakesAuth();
+  const [projectName, setProjectName] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchTicketData = async () => {
@@ -39,6 +41,18 @@ const TicketView = () => {
     fetchTicketData();
   }, [ticketId, bluestakesToken]);
 
+  useEffect(() => {
+    const projectId = Number(searchParams.get("project"));
+    if (projectId) {
+      supabase
+        .from("projects")
+        .select("name")
+        .eq("id", projectId)
+        .single()
+        .then(({ data }) => setProjectName(data?.name || null));
+    }
+  }, [searchParams]);
+  
   useEffect(() => {
     const fetchResponses = async () => {
       if (!ticketId || !bluestakesToken) {
@@ -159,12 +173,6 @@ const TicketView = () => {
       currentTicket.type ||
       currentTicket.revision ||
       "No status";
-  // Fallbacks for description
-  const description =
-    currentTicket.comments ||
-    currentTicket.description ||
-    currentTicket.type ||
-    "No description";
   // Dates
   const formatDate = (dateString) => {
     if (!dateString) return "-";
@@ -213,7 +221,7 @@ const TicketView = () => {
       <div className="max-w-6xl mx-auto">
         <Button variant="ghost" onClick={handleBack} className="mb-4">
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Dashboard
+          Back to {projectName ? `${projectName}` : "Dashboard"}
         </Button>
 
         <Card className="mb-8 animate-fade-in">
