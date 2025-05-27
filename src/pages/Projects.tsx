@@ -126,12 +126,8 @@ export default function Projects() {
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-              <Folder className="h-8 w-8" />
-              Projects
+              XYZ Excavation
             </h1>
-            <p className="text-gray-600 mt-2">
-              Manage your Blue Stakes projects grouped by location
-            </p>
           </div>
           <Button
             onClick={() => setShowCreateModal(true)}
@@ -183,9 +179,9 @@ export default function Projects() {
         {/* Projects table */}
         <Card>
           <CardHeader>
-            <CardTitle>Projects List</CardTitle>
+            <CardTitle>Projects</CardTitle>
             <CardDescription>
-              Click on a project to view all its tickets
+              Click on a project to view its tickets
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -18,11 +18,19 @@ import {
 } from "../components/ui/table";
 import { Skeleton } from "../components/ui/skeleton";
 import { Button } from "../components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { MoreVertical } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useBluestakesAuth } from "@/hooks/useBluestakesAuth";
 import { bluestakesService } from "@/lib/bluestakesService";
 import type { Ticket } from "../types";
 import { ArrowLeft } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Trash2 } from "lucide-react";
 
 function getStatus(ticket: Ticket) {
   if (!ticket.expires) return "Unknown";
@@ -69,6 +77,7 @@ export default function Tickets() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [projectName, setProjectName] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
 
   useEffect(() => {
@@ -139,6 +148,72 @@ export default function Tickets() {
     navigate(url);
   };
 
+  const handleRefreshTickets = async () => {
+    if (!bluestakesToken) return;
+    setLoading(true);
+    try {
+      const allTickets = await bluestakesService.getAllTickets(bluestakesToken);
+      const projectId = Number(searchParams.get("project"));
+      if (!projectId) {
+        setTickets([]);
+        return;
+      }
+
+      const { data: assigned } = await supabase
+        .from("project_tickets")
+        .select("ticket_number")
+        .eq("project_id", projectId);
+
+      const assignedTicketNumbers = new Set(
+        (assigned || []).map((row) => row.ticket_number)
+      );
+      const projectTickets = allTickets.filter((ticket) =>
+        assignedTicketNumbers.has(ticket.ticket)
+      );
+
+      setTickets(projectTickets);
+    } catch (err) {
+      setError(
+        isErrorWithMessage(err) ? err.message : "Failed to refresh tickets"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    const projectId = Number(searchParams.get("project"));
+    if (!projectId) return;
+
+    setIsDeleting(true);
+    try {
+      // First delete all project_tickets entries
+      const { error: ticketsError } = await supabase
+        .from("project_tickets")
+        .delete()
+        .eq("project_id", projectId);
+
+      if (ticketsError) throw ticketsError;
+
+      // Then delete the project itself
+      const { error: projectError } = await supabase
+        .from("projects")
+        .delete()
+        .eq("id", projectId);
+
+      if (projectError) throw projectError;
+
+      // Navigate back to dashboard on success
+      navigate("/");
+    } catch (err) {
+      setError(
+        isErrorWithMessage(err) ? err.message : "Failed to delete project"
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -179,13 +254,59 @@ export default function Tickets() {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       <div className="container mx-auto px-4 py-8">
-      <Button variant="ghost" onClick={() => navigate("/")} className="mb-4">
+        <Button variant="ghost" onClick={() => navigate("/")} className="mb-4">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Dashboard
         </Button>
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle>Tickets for {projectName || "Project"}</CardTitle>
+            <DropdownMenu
+              trigger={
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <span className="sr-only">Open menu</span>
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              }
+            >
+              <DropdownMenuItem onClick={handleRefreshTickets}>
+                Refresh Tickets
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate("/unassigned-tickets")}>
+                View Unassigned Tickets
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <DropdownMenuItem
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Project
+                  </DropdownMenuItem>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete the project
+                      and remove all associated tickets from your project.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDeleteProject}
+                      className="bg-red-600 hover:bg-red-700"
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? "Deleting..." : "Delete Project"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </DropdownMenu>
           </CardHeader>
           <CardContent>
             {loading ? (
