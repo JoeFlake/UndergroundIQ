@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { Navbar } from "../components/Navbar";
 import {
@@ -31,18 +31,6 @@ function getStatus(ticket: Ticket) {
 function formatAddress(ticket: Ticket) {
   const parts = [
     ticket.place,
-    ticket.subdivision && ticket.subdivision.trim()
-      ? `Subdivision: ${ticket.subdivision}`
-      : null,
-    ticket.lot && ticket.lot.trim() ? `Lot: ${ticket.lot}` : null,
-    (ticket.st_from_address && ticket.st_from_address !== "0") ||
-    (ticket.st_to_address && ticket.st_to_address !== "0")
-      ? `Address: ${ticket.st_from_address || ""} - ${ticket.st_to_address || ""}`
-      : null,
-    ticket.street,
-    ticket.cross1,
-    ticket.cross2,
-    ticket.county,
     ticket.city,
     ticket.state,
     ticket.zip,
@@ -72,16 +60,19 @@ function isErrorWithMessage(err: unknown): err is { message: string } {
 export default function Tickets() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [projectName, setProjectName] = useState<string | null>(null);
+  
 
   useEffect(() => {
     async function fetchTickets() {
       setLoading(true);
       setError("");
       try {
-        const projectId = searchParams.get("project");
+        const projectId = Number(searchParams.get("project"));
         if (!projectId) {
           setTickets([]);
           setLoading(false);
@@ -163,13 +154,34 @@ export default function Tickets() {
     if (user) fetchTickets();
   }, [user, searchParams]);
 
+  useEffect(() => {
+    const projectId = Number(searchParams.get("project"));
+    if (projectId) {
+      supabase
+        .from("projects")
+        .select("name")
+        .eq("id", projectId)
+        .single()
+        .then(({ data }) => setProjectName(data?.name || null));
+    }
+  }, [searchParams]);
+
+  const handleRowClick = (ticket: Ticket) => {
+    // Preserve all current query parameters when navigating
+    const params = searchParams.toString();
+    const url = params
+      ? `/tickets/${ticket.ticket}?${params}`
+      : `/tickets/${ticket.ticket}`;
+    navigate(url);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       <div className="container mx-auto px-4 py-8">
         <Card>
           <CardHeader>
-            <CardTitle>Project Tickets</CardTitle>
+            <CardTitle>Tickets for {projectName || "Project"}</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -195,7 +207,11 @@ export default function Tickets() {
                 </TableHeader>
                 <TableBody>
                   {tickets.map((ticket) => (
-                    <TableRow key={ticket.ticket}>
+                    <TableRow
+                      key={ticket.ticket}
+                      onClick={() => handleRowClick(ticket)}
+                      style={{ cursor: "pointer" }}
+                    >
                       <TableCell>{ticket.ticket}</TableCell>
                       <TableCell>
                         <span
@@ -204,7 +220,7 @@ export default function Tickets() {
                               ? "bg-green-100 text-green-800"
                               : getStatus(ticket) === "Expired"
                                 ? "bg-red-100 text-red-800"
-                                : "bg-gray-100 text-gray-800"
+                              : "bg-gray-100 text-gray-800"
                           }`}
                         >
                           {getStatus(ticket)}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { /*supabaseService, */bluestakesService } from "@/lib/supabaseService";
@@ -7,9 +7,11 @@ import { Ticket, Project, UserProject } from "@/types";
 import { ArrowLeft, Calendar, ExternalLink, MapPin, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
-const ProjectView = () => {
+const TicketView = () => {
   const { ticketId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const projectId = searchParams.get("project");
   const [currentTicket, setCurrentTicket] = useState(null);
   const [responses, setResponses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -63,7 +65,11 @@ const ProjectView = () => {
   }, [ticketId, user]);
 
   const handleBack = () => {
-    navigate("/");
+    if (projectId) {
+      navigate(`/tickets?project=${encodeURIComponent(projectId)}`);
+    } else {
+      navigate("/");
+    }
   };
 
   if (loading) {
@@ -340,4 +346,4 @@ const ProjectView = () => {
   );
 };
 
-export default ProjectView;
+export default TicketView;
