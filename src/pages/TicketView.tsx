@@ -173,6 +173,7 @@ const TicketView = () => {
   const formatDate = (dateString) => {
     if (!dateString) return "-";
     const options: Intl.DateTimeFormatOptions = { 
+      weekday: "long" as const,
       year: "numeric" as const, 
       month: "short" as const, 
       day: "numeric" as const 
@@ -256,7 +257,7 @@ const TicketView = () => {
                       {formatDate(currentTicket.legal_date)}
                     </div>
                     <div>
-                      <span className="font-semibold">Update-By Date:</span>{" "}
+                      <span className="font-semibold">Update Date:</span>{" "}
                       {formatDate(currentTicket.replace_by_date)}
                     </div>
                     <div>

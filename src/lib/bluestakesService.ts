@@ -271,15 +271,24 @@ export const bluestakesService = {
   },
   
   async getResponsesByTicket(ticketNumber: string, token: string): Promise<BlueStakesResponse[]> {
-    const authHeader = token.startsWith("Bearer ") ? token : "Bearer " + token;
-    const response = await fetch(`${BASE_URL}/tickets/${ticketNumber}/responses`, {
-      headers: {
-        accept: "application/json", 
-        Authorization: authHeader,
-      },
-    });
-    if (!response.ok) throw new Error("Failed to fetch ticket responses");
-    return await response.json();
+    try {
+      const authHeader = token.startsWith("Bearer ") ? token : "Bearer " + token;
+      const response = await fetch(`${BASE_URL}/tickets/${ticketNumber}/responses`, {
+        headers: {
+          accept: "application/json",
+          Authorization: authHeader,
+        },
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to fetch ticket responses");
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? data : data.data || [];
+    } catch (error) {
+      console.error(`Error fetching responses for ticket ${ticketNumber}:`, error);
+      throw error;
+    }
   },
 
   async getTicketsNeedingUpdate(token: string): Promise<BlueStakesTicket[]> {

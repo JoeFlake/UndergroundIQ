@@ -133,7 +133,7 @@ export default function Projects() {
             onClick={() => setShowCreateModal(true)}
             className="ml-4 flex items-center gap-2"
           >
-            <Plus className="h-4 w-4" /> Create New Project
+            <Plus className="h-4 w-4" /> New Project
           </Button>
         </div>
         {/* Create Project Modal */}

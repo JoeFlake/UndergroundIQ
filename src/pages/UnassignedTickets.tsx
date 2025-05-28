@@ -23,6 +23,7 @@ import { Input } from "../components/ui/input";
 import { useAuth } from "../contexts/AuthContext";
 import type { Project } from "../types";
 import { useToast } from "../components/ui/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog";
 
 // Remove the local Ticket interface and use BlueStakesTicket instead
 type Ticket = BlueStakesTicket;
@@ -86,6 +87,9 @@ export default function UnassignedTickets() {
   const [assignError, setAssignError] = useState("");
   const [assignSuccess, setAssignSuccess] = useState("");
   const [updatingTicket, setUpdatingTicket] = useState<string | null>(null);
+  const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [creatingProject, setCreatingProject] = useState(false);
   // Add function to get project name for a ticket
   const getProjectForTicket = async (ticketNumber: string) => {
     try {
@@ -281,6 +285,90 @@ export default function UnassignedTickets() {
     }
   };
 
+  const formatStreetAddress = (ticket: Ticket) => {
+    const parts = [];
+    
+    // Handle street address with from/to if available
+    const fromAddress = ticket.st_from_address?.trim();
+    const toAddress = ticket.st_to_address?.trim();
+    
+    if (fromAddress && toAddress && fromAddress !== '0' && toAddress !== '0') {
+      if (fromAddress === toAddress) {
+        parts.push(`${fromAddress} ${ticket.street?.trim()}`);
+      } else {
+        parts.push(`${ticket.street?.trim()} from ${fromAddress} to ${toAddress}`);
+      }
+    } else if (ticket.cross1?.trim() && ticket.cross2?.trim()) {
+      // If no from/to addresses, show cross streets
+      parts.push(`${ticket.street?.trim()} from ${ticket.cross1.trim()} to ${ticket.cross2.trim()}`);
+    } else if (ticket.street?.trim()) {
+      // Fallback to just street name if no other location data
+      parts.push(ticket.street.trim());
+    }
+    
+    if (ticket.place?.trim()) parts.push(ticket.place.trim());
+    return parts.join(', ');
+  };
+
+  // Add function to create new project
+  const handleCreateProject = async () => {
+    if (!newProjectName.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a project name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setCreatingProject(true);
+    try {
+      // Insert new project
+      const { data: newProject, error: projectError } = await supabase
+        .from("projects")
+        .insert([{ name: newProjectName.trim() }])
+        .select()
+        .single();
+
+      if (projectError) throw projectError;
+
+      // Add user to project
+      const { error: userProjectError } = await supabase
+        .from("user_projects")
+        .insert([{ 
+          user_id: user.id, 
+          project_id: newProject.id 
+        }]);
+
+      if (userProjectError) throw userProjectError;
+
+      // Update projects list
+      setProjects(prev => [...prev, { 
+        project_id: newProject.id, 
+        project_name: newProject.name 
+      }]);
+
+      // Select the new project
+      setSelectedProject(newProject.id.toString());
+      
+      toast({
+        title: "Success",
+        description: "Project created successfully",
+      });
+
+      setIsNewProjectModalOpen(false);
+      setNewProjectName("");
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: isErrorWithMessage(error) ? error.message : "Failed to create project",
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingProject(false);
+    }
+  };
+
   if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -345,7 +433,7 @@ export default function UnassignedTickets() {
                           <span className="text-gray-400">Loading...</span>
                         )}
                       </TableCell>
-                      <TableCell>{formatDate(ticket.replace_by_date)}</TableCell>
+                      <TableCell>{formatDate(ticket.replace_by_date).split(' ')[0]}</TableCell>
                       <TableCell>
                         <div className="flex gap-2">
                           <Button
@@ -374,10 +462,9 @@ export default function UnassignedTickets() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Ticket Number</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Expires</TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>Done For</TableHead>
                   <TableHead>Address</TableHead>
-                  <TableHead>Assign</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -387,32 +474,18 @@ export default function UnassignedTickets() {
                       colSpan={7}
                       className="text-center text-gray-500 py-8"
                     >
-                      No tickets found
+                      All Tickets have been assigned
                     </TableCell>
                   </TableRow>
                 ) : (
                   tickets.map((ticket) => (
                     <TableRow key={ticket.ticket}>
                       <TableCell>{ticket.ticket}</TableCell>
+                      <TableCell>{ticket.contact}</TableCell>
+                      <TableCell>{ticket.done_for}</TableCell>
                       <TableCell>
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            getStatus(ticket) === "Active"
-                              ? "bg-green-100 text-green-800"
-                              : getStatus(ticket) === "Expired"
-                                ? "bg-red-100 text-red-800"
-                                : "bg-gray-100 text-gray-800"
-                          }`}
-                        >
-                          {getStatus(ticket)}
-                        </span>
+                        {formatStreetAddress(ticket)}
                       </TableCell>
-                      <TableCell>{formatDate(ticket.original_date)}</TableCell>
-                      <TableCell>
-                        {formatDate(ticket.replace_by_date)}
-                      </TableCell>
-                      <TableCell>{formatDate(ticket.expires)}</TableCell>
-                      <TableCell>{formatAddress(ticket)}</TableCell>
                       <TableCell>
                         <Button
                           size="sm"
@@ -436,20 +509,28 @@ export default function UnassignedTickets() {
                 Assign Ticket {assigningTicket.ticket} to Project
               </h2>
               <div className="mb-4">
-                <label className="block mb-2 font-medium">Select Project</label>
-                <select
-                  className="w-full border rounded p-2"
-                  value={selectedProject}
-                  onChange={(e) => setSelectedProject(e.target.value)}
-                  disabled={assigning}
-                >
-                  <option value="">-- Select a project --</option>
-                  {projects.map((project) => (
-                    <option key={project.project_id} value={project.project_id}>
-                      {project.project_name}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex gap-2 mb-2">
+                  <select
+                    className="flex-1 border rounded p-2"
+                    value={selectedProject}
+                    onChange={(e) => setSelectedProject(e.target.value)}
+                    disabled={assigning}
+                  >
+                    <option value="">-- Select a project --</option>
+                    {projects.map((project) => (
+                      <option key={project.project_id} value={project.project_id}>
+                        {project.project_name}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsNewProjectModalOpen(true)}
+                    disabled={assigning}
+                  >
+                    New Project
+                  </Button>
+                </div>
               </div>
               {assignError && (
                 <div className="text-red-500 mb-2">{assignError}</div>
@@ -475,6 +556,38 @@ export default function UnassignedTickets() {
             </div>
           </div>
         )}
+
+        {/* New Project Modal */}
+        <Dialog open={isNewProjectModalOpen} onOpenChange={setIsNewProjectModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New Project</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <Input
+                placeholder="Enter project name"
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                disabled={creatingProject}
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsNewProjectModalOpen(false)}
+                disabled={creatingProject}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateProject}
+                disabled={creatingProject || !newProjectName.trim()}
+              >
+                {creatingProject ? "Creating..." : "Create Project"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

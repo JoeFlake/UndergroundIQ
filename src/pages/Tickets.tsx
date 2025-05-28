@@ -54,7 +54,12 @@ function formatAddress(ticket: Ticket) {
 function formatDate(dateString: string | undefined) {
   if (!dateString) return "-";
   try {
-    return new Date(dateString).toLocaleString();
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      weekday: 'long',
+      month: 'long', 
+      day: 'numeric'
+    });
   } catch {
     return dateString;
   }
@@ -216,6 +221,31 @@ export default function Tickets() {
     }
   };
 
+  const formatStreetAddress = (ticket: Ticket) => {
+    const parts = [];
+    
+    // Handle street address with from/to if available
+    const fromAddress = ticket.st_from_address?.trim();
+    const toAddress = ticket.st_to_address?.trim();
+    
+    if (fromAddress && toAddress && fromAddress !== '0' && toAddress !== '0') {
+      if (fromAddress === toAddress) {
+        parts.push(`${fromAddress} ${ticket.street?.trim()}`);
+      } else {
+        parts.push(`${ticket.street?.trim()} from ${fromAddress} to ${toAddress}`);
+      }
+    } else if (ticket.cross1?.trim() && ticket.cross2?.trim()) {
+      // If no from/to addresses, show cross streets
+      parts.push(`${ticket.street?.trim()} from ${ticket.cross1.trim()} to ${ticket.cross2.trim()}`);
+    } else if (ticket.street?.trim()) {
+      // Fallback to just street name if no other location data
+      parts.push(ticket.street.trim());
+    }
+    
+    if (ticket.place?.trim()) parts.push(ticket.place.trim());
+    return parts.join(', ');
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -325,9 +355,7 @@ export default function Tickets() {
                   <TableRow>
                     <TableHead>Ticket #</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Original Date</TableHead>
-                    <TableHead>Replace By Date</TableHead>
-                    <TableHead>Expires</TableHead>
+                    <TableHead>Update Date</TableHead>
                     <TableHead>Address</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -352,12 +380,10 @@ export default function Tickets() {
                           {getStatus(ticket)}
                         </span>
                       </TableCell>
-                      <TableCell>{formatDate(ticket.original_date)}</TableCell>
                       <TableCell>
                         {formatDate(ticket.replace_by_date)}
                       </TableCell>
-                      <TableCell>{formatDate(ticket.expires)}</TableCell>
-                      <TableCell>{formatAddress(ticket)}</TableCell>
+                      <TableCell>{formatStreetAddress(ticket)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
