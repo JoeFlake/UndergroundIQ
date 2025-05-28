@@ -2,9 +2,8 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { bluestakesService } from "@/lib/supabaseService";
-import { Ticket, Project, UserProject } from "@/types";
-import { ArrowLeft, Calendar, ExternalLink, MapPin, Users } from "lucide-react";
+import { bluestakesService } from "@/lib/bluestakesService";
+import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBluestakesAuth } from "@/hooks/useBluestakesAuth";
 import { supabase } from "@/lib/supabaseClient";
@@ -67,10 +66,7 @@ const TicketView = () => {
           bluestakesToken
         );
         console.log('Received responses data:', responsesData);
-        // Check if responses is nested in the data
-        const actualResponses = responsesData.responses || responsesData;
-        console.log('Processed responses:', actualResponses);
-        setResponses(actualResponses);
+        setResponses(responsesData);
       } catch (error) {
         console.error("Error fetching responses data:", error);
       } finally {

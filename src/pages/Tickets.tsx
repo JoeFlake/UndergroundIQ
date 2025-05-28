@@ -26,11 +26,13 @@ import {
 import { MoreVertical } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useBluestakesAuth } from "@/hooks/useBluestakesAuth";
-import { bluestakesService } from "@/lib/bluestakesService";
-import type { Ticket } from "../types";
+import { bluestakesService, type BlueStakesTicket } from "../lib/bluestakesService";
 import { ArrowLeft } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Trash2 } from "lucide-react";
+
+// Remove the Ticket type import and use BlueStakesTicket instead
+type Ticket = BlueStakesTicket;
 
 function getStatus(ticket: Ticket) {
   if (!ticket.expires) return "Unknown";
@@ -256,7 +258,7 @@ export default function Tickets() {
       <div className="container mx-auto px-4 py-8">
         <Button variant="ghost" onClick={() => navigate("/")} className="mb-4">
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Dashboard
+          Back to Projects
         </Button>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -327,7 +329,6 @@ export default function Tickets() {
                     <TableHead>Replace By Date</TableHead>
                     <TableHead>Expires</TableHead>
                     <TableHead>Address</TableHead>
-                    <TableHead>Description</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -357,7 +358,6 @@ export default function Tickets() {
                       </TableCell>
                       <TableCell>{formatDate(ticket.expires)}</TableCell>
                       <TableCell>{formatAddress(ticket)}</TableCell>
-                      <TableCell>{ticket.description}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

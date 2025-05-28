@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { Navbar } from "../components/Navbar";
+import { useBluestakesAuth } from "../hooks/useBluestakesAuth";
+import { bluestakesService, type BlueStakesTicket } from "../lib/bluestakesService";
 import {
   Card,
   CardContent,
@@ -19,7 +21,11 @@ import { Skeleton } from "../components/ui/skeleton";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { useAuth } from "../contexts/AuthContext";
-import type { Ticket, Project } from "../types";
+import type { Project } from "../types";
+import { useToast } from "../components/ui/use-toast";
+
+// Remove the local Ticket interface and use BlueStakesTicket instead
+type Ticket = BlueStakesTicket;
 
 function formatDate(dateString: string | undefined) {
   if (!dateString) return "-";
@@ -38,22 +44,12 @@ function getStatus(ticket: Ticket) {
 }
 
 function formatAddress(ticket: Ticket) {
-  // Build a more descriptive address using the provided fields
   const parts = [
-    ticket.place,
-    ticket.subdivision && ticket.subdivision.trim()
-      ? `Subdivision: ${ticket.subdivision}`
-      : null,
-    ticket.lot && ticket.lot.trim() ? `Lot: ${ticket.lot}` : null,
-    (ticket.st_from_address && ticket.st_from_address !== "0") ||
-    (ticket.st_to_address && ticket.st_to_address !== "0")
-      ? `From ${ticket.st_from_address} to ${ticket.st_to_address}`
-      : null,
-    ticket.street,
-    ticket.cross1 && ticket.cross1.trim() ? `Cross: ${ticket.cross1}` : null,
-    ticket.cross2 && ticket.cross2.trim() ? `Cross: ${ticket.cross2}` : null,
+    ticket.address1,
+    ticket.city,
+    ticket.cstate,
+    ticket.zip,
     ticket.county ? `${ticket.county} County` : null,
-    ticket.state,
   ].filter(Boolean);
   return parts.join(", ");
 }
@@ -68,9 +64,19 @@ function isErrorWithMessage(err: unknown): err is { message: string } {
   );
 }
 
+interface ProjectData {
+  project_id: number;
+  projects: {
+    name: string;
+  };
+}
+
 export default function UnassignedTickets() {
+  const { toast } = useToast();
   const { user } = useAuth();
+  const { bluestakesToken, isLoading: authLoading, error: authError } = useBluestakesAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [ticketsNeedingUpdate, setTicketsNeedingUpdate] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [projects, setProjects] = useState<Project[]>([]);
@@ -79,71 +85,45 @@ export default function UnassignedTickets() {
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState("");
   const [assignSuccess, setAssignSuccess] = useState("");
+  const [updatingTicket, setUpdatingTicket] = useState<string | null>(null);
+  // Add function to get project name for a ticket
+  const getProjectForTicket = async (ticketNumber: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('project_tickets')
+        .select('project_id, projects(name)')
+        .eq('ticket_number', ticketNumber)
+        .single() as { data: ProjectData | null; error: unknown };
+
+      if (error) throw error;
+      return data?.projects?.name || 'Unassigned';
+    } catch (error) {
+      console.error('Error fetching project for ticket:', error);
+      return 'Error';
+    }
+  };
+
+  // Add state for project names
+  const [ticketProjects, setTicketProjects] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const fetchAllTickets = async () => {
+      if (!bluestakesToken) {
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError("");
       try {
-        // 1. Get Blue Stakes credentials for the current user
-        const {
-          data: userProfile,
-          error: userError,
-        }: {
-          data: {
-            bluestakes_username: string;
-            bluestakes_password: string;
-            id: string;
-          } | null;
-          error: unknown;
-        } = await supabase
-          .from("users")
-          .select("bluestakes_username, bluestakes_password, id")
-          .eq("id", user.id)
-          .single();
-        if (userError) throw userError;
-        if (
-          !userProfile?.bluestakes_username ||
-          !userProfile?.bluestakes_password
-        ) {
-          throw new Error("Blue Stakes credentials not found");
-        }
+        // Fetch tickets needing updates
+        const updateTickets = await bluestakesService.getTicketsNeedingUpdate(bluestakesToken);
+        setTicketsNeedingUpdate(updateTickets);
 
-        // 2. Log in to Blue Stakes API to get Bearer token
-        const loginResp = await fetch(
-          "https://newtin-api.bluestakes.org/api/login",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({
-              username: userProfile.bluestakes_username,
-              password: userProfile.bluestakes_password,
-            }).toString(),
-          }
-        );
-        const loginData = await loginResp.json();
-        if (!loginResp.ok || !loginData.Authorization) {
-          throw new Error("Failed to log in to Blue Stakes");
-        }
-        const bearerToken = loginData.Authorization.replace("Bearer ", "");
+        // Fetch all tickets
+        const allTickets = await bluestakesService.getAllTickets(bluestakesToken);
 
-        // 3. Fetch tickets/summary with Bearer token
-        const summaryResp = await fetch(
-          "https://newtin-api.bluestakes.org/api/tickets/summary",
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${bearerToken}`,
-              Accept: "application/json",
-            },
-          }
-        );
-        const responseData = await summaryResp.json();
-        const allTickets: Ticket[] = Array.isArray(responseData)
-          ? responseData
-          : responseData.data || [];
-
-        // 4. Fetch all assigned ticket numbers from project_tickets
+        // Fetch all assigned ticket numbers from project_tickets
         const {
           data: assigned,
           error: assignedError,
@@ -154,17 +134,18 @@ export default function UnassignedTickets() {
           (assigned || []).map((row) => row.ticket_number)
         );
 
-        // 5. Filter out assigned tickets and only keep active ones
+        // Filter out assigned tickets and only keep active ones
         const now = new Date();
-        const unassignedActiveTickets = allTickets.filter(
+        const filteredTickets = allTickets.filter(
           (ticket) =>
             !assignedTicketNumbers.has(ticket.ticket) &&
             ticket.expires &&
             new Date(ticket.expires) > now
         );
-        setTickets(unassignedActiveTickets);
 
-        // 6. Fetch projects for this user
+        setTickets(filteredTickets);
+
+        // Fetch projects for this user
         const {
           data: userProjects,
           error: userProjectsError,
@@ -206,8 +187,26 @@ export default function UnassignedTickets() {
       }
     };
 
-    if (user) fetchAllTickets();
-  }, [user]);
+    if (user && bluestakesToken) fetchAllTickets();
+  }, [user, bluestakesToken]);
+
+  // Update useEffect to fetch project names
+  useEffect(() => {
+    const fetchProjectNames = async () => {
+      if (ticketsNeedingUpdate.length === 0) return;
+
+      const projectNames: Record<string, string> = {};
+      await Promise.all(
+        ticketsNeedingUpdate.map(async (ticket) => {
+          const projectName = await getProjectForTicket(ticket.ticket);
+          projectNames[ticket.ticket] = projectName;
+        })
+      );
+      setTicketProjects(projectNames);
+    };
+
+    fetchProjectNames();
+  }, [ticketsNeedingUpdate]);
 
   const openAssignModal = (ticket: Ticket) => {
     setAssigningTicket(ticket);
@@ -259,7 +258,30 @@ export default function UnassignedTickets() {
     }
   };
 
-  if (loading) {
+  const handleUpdateTicket = async (ticket: Ticket) => {
+    try {
+      // Copy ticket number to clipboard
+      await navigator.clipboard.writeText(ticket.ticket);
+      
+      // Show success toast
+      toast({
+        title: "Ticket Number Copied",
+        description: `Ticket number ${ticket.ticket} has been copied to clipboard`,
+      });
+
+      // Navigate to external URL
+      const ticketUrl = `https://newtin.bluestakes.org/newtinweb/UTAH_ticketentry.html`;
+      window.open(ticketUrl, '_blank');
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to copy ticket number or open URL",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar />
@@ -271,14 +293,14 @@ export default function UnassignedTickets() {
     );
   }
 
-  if (error) {
+  if (authError || error) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar />
         <div className="container mx-auto px-4 py-8">
           <Card>
             <CardContent className="p-8 text-center">
-              <p className="text-red-500 text-lg">{error}</p>
+              <p className="text-red-500 text-lg">{authError || error}</p>
             </CardContent>
           </Card>
         </div>
@@ -290,11 +312,61 @@ export default function UnassignedTickets() {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       <div className="container mx-auto px-4 py-8">
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle>Tickets To Update</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Ticket Number</TableHead>
+                  <TableHead>Project</TableHead>
+                  <TableHead>Update Date</TableHead>
+                  <TableHead>Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {ticketsNeedingUpdate.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={4}
+                      className="text-center text-gray-500 py-8"
+                    >
+                      No tickets need updates
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  ticketsNeedingUpdate.map((ticket) => (
+                    <TableRow key={ticket.ticket}>
+                      <TableCell>{ticket.ticket}</TableCell>
+                      <TableCell>
+                        {ticketProjects[ticket.ticket] || (
+                          <span className="text-gray-400">Loading...</span>
+                        )}
+                      </TableCell>
+                      <TableCell>{formatDate(ticket.replace_by_date)}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleUpdateTicket(ticket)}
+                          >
+                            Update
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader>
             <CardTitle>
-              {tickets.length} Unassigned Ticket
-              {tickets.length === 1 ? "" : "s"}
+              Unassigned Tickets
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -303,8 +375,6 @@ export default function UnassignedTickets() {
                 <TableRow>
                   <TableHead>Ticket Number</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Original Date</TableHead>
-                  <TableHead>Replace By Date</TableHead>
                   <TableHead>Expires</TableHead>
                   <TableHead>Address</TableHead>
                   <TableHead>Assign</TableHead>

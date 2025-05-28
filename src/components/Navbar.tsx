@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "./ui/button";
-import { User, Folder, Home as HomeIcon } from "lucide-react";
+import { User, Folder, Home as HomeIcon, CheckSquare } from "lucide-react";
 import logo from "../assets/images/LogoWide.png";
 
 export function Navbar() {
@@ -59,8 +59,8 @@ export function Navbar() {
                     : "border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-900"
                 }`}
               >
-                <Folder className="h-4 w-4 mr-2" />
-                Unassigned Tickets
+                <CheckSquare className="h-4 w-4 mr-2" />
+                To Do
               </button>
             </div>
           </div>
