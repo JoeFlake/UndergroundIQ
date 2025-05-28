@@ -79,6 +79,7 @@ export default function UnassignedTickets() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [ticketsNeedingUpdate, setTicketsNeedingUpdate] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingUpdates, setLoadingUpdates] = useState(true);
   const [error, setError] = useState<string>("");
   const [projects, setProjects] = useState<Project[]>([]);
   const [assigningTicket, setAssigningTicket] = useState<Ticket | null>(null);
@@ -111,8 +112,9 @@ export default function UnassignedTickets() {
   // Add state for project names
   const [ticketProjects, setTicketProjects] = useState<Record<string, string>>({});
 
+  // First effect to fetch unassigned tickets
   useEffect(() => {
-    const fetchAllTickets = async () => {
+    const fetchUnassignedTickets = async () => {
       if (!bluestakesToken) {
         setLoading(false);
         return;
@@ -121,10 +123,6 @@ export default function UnassignedTickets() {
       setLoading(true);
       setError("");
       try {
-        // Fetch tickets needing updates
-        const updateTickets = await bluestakesService.getTicketsNeedingUpdate(bluestakesToken);
-        setTicketsNeedingUpdate(updateTickets);
-
         // Fetch all tickets
         const allTickets = await bluestakesService.getAllTickets(bluestakesToken);
 
@@ -141,11 +139,69 @@ export default function UnassignedTickets() {
 
         // Filter out assigned tickets and only keep active ones
         const now = new Date();
-        const filteredTickets = allTickets.filter(
+        const unassignedTickets = allTickets.filter(
           (ticket) =>
             !assignedTicketNumbers.has(ticket.ticket) &&
             ticket.expires &&
             new Date(ticket.expires) > now
+        );
+
+        // For each unassigned ticket, check if it's an update of an existing ticket
+        const updatePromises = unassignedTickets.map(async (ticket) => {
+          try {
+            // Get detailed ticket info including original ticket
+            const ticketDetails = await bluestakesService.getTicketByNumber(ticket.ticket, bluestakesToken);
+            
+            if (ticketDetails.original_ticket) {
+              // Check if the original ticket is assigned to any projects
+              const { data: originalAssignments, error: originalError } = await supabase
+                .from('project_tickets')
+                .select('project_id')
+                .eq('ticket_number', ticketDetails.original_ticket);
+
+              if (originalError) throw originalError;
+
+              if (originalAssignments && originalAssignments.length > 0) {
+                // Create new assignments for each project the original ticket was assigned to
+                const assignmentPromises = originalAssignments.map(assignment => 
+                  supabase
+                    .from('project_tickets')
+                    .insert({
+                      project_id: assignment.project_id,
+                      ticket_number: ticket.ticket,
+                      replace_by_date: ticketDetails.replace_by_date
+                    })
+                );
+
+                await Promise.all(assignmentPromises);
+                return true; // Ticket was assigned
+              }
+            }
+            return false; // No original ticket or no assignments found
+          } catch (error) {
+            console.error(`Error processing ticket ${ticket.ticket}:`, error);
+            return false;
+          }
+        });
+
+        // Wait for all ticket checks to complete
+        const assignmentResults = await Promise.all(updatePromises);
+
+        // Fetch updated assigned tickets after potential updates
+        const {
+          data: updatedAssigned,
+          error: updatedAssignedError,
+        } = await supabase.from("project_tickets").select("ticket_number");
+        
+        if (updatedAssignedError) throw updatedAssignedError;
+        
+        const updatedAssignedTicketNumbers = new Set(
+          (updatedAssigned || []).map((row) => row.ticket_number)
+        );
+
+        // Filter out newly assigned tickets
+        const filteredTickets = unassignedTickets.filter(
+          (ticket, index) => !assignmentResults[index] && !updatedAssignedTicketNumbers.has(ticket.ticket)
         );
 
         setTickets(filteredTickets);
@@ -192,8 +248,31 @@ export default function UnassignedTickets() {
       }
     };
 
-    if (user && bluestakesToken) fetchAllTickets();
+    if (user && bluestakesToken) fetchUnassignedTickets();
   }, [user, bluestakesToken]);
+
+  // Second effect to fetch tickets needing updates
+  useEffect(() => {
+    const fetchTicketsNeedingUpdate = async () => {
+      if (!bluestakesToken || loading) return; // Wait for unassigned tickets to load first
+
+      setLoadingUpdates(true);
+      try {
+        const updateTickets = await bluestakesService.getTicketsNeedingUpdate(bluestakesToken);
+        setTicketsNeedingUpdate(updateTickets);
+      } catch (err: unknown) {
+        toast({
+          title: "Error",
+          description: isErrorWithMessage(err) ? err.message : "Failed to fetch tickets needing updates",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingUpdates(false);
+      }
+    };
+
+    fetchTicketsNeedingUpdate();
+  }, [bluestakesToken, loading]); // Add loading as dependency to ensure it runs after unassigned tickets are loaded
 
   // Update useEffect to fetch project names
   useEffect(() => {
@@ -373,7 +452,7 @@ export default function UnassignedTickets() {
     }
   };
 
-  if (authLoading || loading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar />
@@ -409,50 +488,58 @@ export default function UnassignedTickets() {
             <CardTitle>Tickets To Update</CardTitle>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Ticket Number</TableHead>
-                  <TableHead>Project</TableHead>
-                  <TableHead>Update Date</TableHead>
-                  <TableHead>Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {ticketsNeedingUpdate.length === 0 ? (
+            {loadingUpdates ? (
+              <div className="space-y-2">
+                <Skeleton className="h-10" />
+                <Skeleton className="h-10" />
+                <Skeleton className="h-10" />
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell
-                      colSpan={4}
-                      className="text-center text-gray-500 py-8"
-                    >
-                      No tickets need updates
-                    </TableCell>
+                    <TableHead>Ticket Number</TableHead>
+                    <TableHead>Project</TableHead>
+                    <TableHead>Update Date</TableHead>
+                    <TableHead>Action</TableHead>
                   </TableRow>
-                ) : (
-                  ticketsNeedingUpdate.map((ticket) => (
-                    <TableRow key={ticket.ticket}>
-                      <TableCell>{ticket.ticket}</TableCell>
-                      <TableCell>
-                        {ticketProjects[ticket.ticket] || (
-                          <span className="text-gray-400">Loading...</span>
-                        )}
-                      </TableCell>
-                      <TableCell>{formatDate(ticket.replace_by_date).split(' ')[0]}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => handleUpdateTicket(ticket)}
-                          >
-                            Update
-                          </Button>
-                        </div>
+                </TableHeader>
+                <TableBody>
+                  {ticketsNeedingUpdate.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={4}
+                        className="text-center text-gray-500 py-8"
+                      >
+                        No tickets need updates
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  ) : (
+                    ticketsNeedingUpdate.map((ticket) => (
+                      <TableRow key={ticket.ticket}>
+                        <TableCell>{ticket.ticket}</TableCell>
+                        <TableCell>
+                          {ticketProjects[ticket.ticket] || (
+                            <span className="text-gray-400">Loading...</span>
+                          )}
+                        </TableCell>
+                        <TableCell>{formatDate(ticket.replace_by_date).split(',')[0]}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleUpdateTicket(ticket)}
+                            >
+                              Update
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
         <Card>
