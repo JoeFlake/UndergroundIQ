@@ -97,13 +97,14 @@ export default function UnassignedTickets() {
         .from('project_tickets')
         .select('project_id, projects(name)')
         .eq('ticket_number', ticketNumber)
-        .single() as { data: ProjectData | null; error: unknown };
+        .maybeSingle();
 
-      if (error) throw error;
-      return data?.projects?.name || 'Unassigned';
+      if (error && error.code !== 'PGRST116') throw error;
+      const project = Array.isArray(data?.projects) ? data.projects[0] : data?.projects;
+      return project?.name || 'Unassigned';
     } catch (error) {
       console.error('Error fetching project for ticket:', error);
-      return 'Error';
+      return 'Unassigned';
     }
   };
 
@@ -235,17 +236,20 @@ export default function UnassignedTickets() {
     setAssignError("");
     setAssignSuccess("");
     try {
+      // Fetch ticket details to get replace_by_date
+      const ticketDetails = await bluestakesService.getTicketByNumber(assigningTicket.ticket, bluestakesToken);
+
       const { error } = await supabase.from("project_tickets").insert([
         {
           project_id: selectedProject,
           ticket_number: assigningTicket.ticket,
+          replace_by_date: ticketDetails.replace_by_date,
         },
       ]);
       if (error) {
         setAssignError(error.message);
       } else {
         setAssignSuccess("Ticket assigned successfully!");
-        // Optionally remove the ticket from the list
         setTickets((prev) =>
           prev.filter((t) => t.ticket !== assigningTicket.ticket)
         );

@@ -160,39 +160,6 @@ interface TicketSecondaryFunction {
   // Add other fields if they exist in the response
 }
 
-interface TicketUpdatePayload {
-  contact: string;
-  contact_phone: string;
-  contact_phone_ext: string;
-  caller: string;
-  caller_phone: string;
-  caller_phone_ext: string;
-  caller_type: string;
-  address1: string;
-  city: string;
-  cstate: string;
-  zip: string;
-  name: string;
-  phone: string;
-  phone_ext: string;
-  email: string;
-  eml_confirm: boolean;
-  cell: string;
-  sms_confirm: boolean;
-  blasting: boolean;
-  boring: string;
-  done_for: string;
-  work_type: string;
-  comments: string;
-  remarks: string;
-  membersToAdd: string;
-}
-
-interface TicketUpdateResponse {
-  ticket: string;
-  revision: string;
-}
-
 const BASE_URL = "https://newtiny-api.bluestakes.org/api";
 
 function getLatestRevisions(tickets: BlueStakesTicket[]): BlueStakesTicket[] {
@@ -293,21 +260,44 @@ export const bluestakesService = {
 
   async getTicketsNeedingUpdate(token: string): Promise<BlueStakesTicket[]> {
     try {
-      // First get all tickets
-      const allTickets = await this.getAllTickets(token);
-      
+      // Get all assigned tickets from project_tickets
+      const { data: assignedTickets, error: dbError } = await supabase
+        .from("project_tickets")
+        .select("ticket_number");
+
+      if (dbError) {
+        throw new Error(`Failed to fetch assigned tickets: ${dbError.message}`);
+      }
+
+      if (!assignedTickets?.length) {
+        return [];
+      }
+
       // Calculate the date 7 days from now
       const sevenDaysFromNow = new Date();
       sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
 
+      // Fetch ticket details for all assigned tickets
+      const ticketDetails = await Promise.all(
+        assignedTickets.map(async ({ ticket_number }) => {
+          try {
+            const ticket = await this.getTicketByNumber(ticket_number, token);
+            return ticket;
+          } catch (error) {
+            console.error(`Error fetching details for ticket ${ticket_number}:`, error);
+            return null;
+          }
+        })
+      );
+
       // Filter tickets that are within 7 days of their replace_by_date
-      const ticketsToCheck = allTickets.filter(ticket => {
-        if (!ticket.replace_by_date) return false;
+      const ticketsToCheck = ticketDetails.filter((ticket): ticket is BlueStakesTicket => {
+        if (!ticket?.replace_by_date) return false;
         const replaceDate = new Date(ticket.replace_by_date);
         return replaceDate <= sevenDaysFromNow && replaceDate >= new Date();
       });
 
-      // Then check only the filtered tickets' secondary functions
+      // Check secondary functions for filtered tickets
       const ticketsNeedingUpdate = await Promise.all(
         ticketsToCheck.map(async (ticket) => {
           try {
