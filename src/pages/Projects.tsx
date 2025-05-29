@@ -33,6 +33,36 @@ export default function Projects() {
   const [newProjectName, setNewProjectName] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
+  const [companyName, setCompanyName] = useState("");
+
+  async function fetchUserCompany() {
+    if (!user) return;
+    
+    // First, let's see what user data we have
+    const { data: userData, error: userError } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+    
+    console.log("User data:", userData);
+    
+    // Then try to get company data
+    const { data: companyData, error: companyError } = await supabase
+      .from("companies")
+      .select("*")
+      .eq("id", userData?.company_id)
+      .single();
+    
+    console.log("Company data:", companyData);
+    console.log("Company error:", companyError);
+    
+    if (!companyError && companyData) {
+      setCompanyName(companyData.name);
+    } else {
+      console.log("Failed to get company name. User data:", JSON.stringify(userData, null, 2));
+    }
+  }
 
   async function fetchProjects() {
     setLoading(true);
@@ -49,7 +79,10 @@ export default function Projects() {
   }
 
   useEffect(() => {
-    if (user) fetchProjects();
+    if (user) {
+      fetchProjects();
+      fetchUserCompany();
+    }
   }, [user]);
 
   const filteredProjects = projects.filter(
@@ -126,7 +159,7 @@ export default function Projects() {
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-              XYZ Excavation
+              {companyName}
             </h1>
           </div>
           <Button
