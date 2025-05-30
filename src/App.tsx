@@ -17,8 +17,26 @@ import Projects from "./pages/Projects";
 import Tickets from "./pages/Tickets";
 import UnassignedTickets from "./pages/UnassignedTickets";
 import SetPassword from "./pages/SetPassword";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 const queryClient = new QueryClient();
+
+function InviteRedirector() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = params.get("access_token");
+    const type = params.get("type");
+    if (type === "invite" && accessToken) {
+      // Redirect to /set-password, preserving the hash
+      navigate("/set-password" + window.location.hash, { replace: true });
+    }
+  }, [navigate]);
+
+  return null;
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -27,6 +45,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <AuthProvider>
+          <InviteRedirector />
           <Routes>
             <Route
               path="/"
