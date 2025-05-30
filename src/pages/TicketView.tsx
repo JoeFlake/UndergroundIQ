@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBluestakesAuth } from "@/hooks/useBluestakesAuth";
 import { supabase } from "@/lib/supabaseClient";
+import { Map } from "../components/Map";
 
 const TicketView = () => {
   const { ticketId } = useParams();
@@ -59,20 +60,14 @@ const TicketView = () => {
   useEffect(() => {
     const fetchResponses = async () => {
       if (!ticketId || !bluestakesToken) {
-        console.log("Missing required data:", {
-          ticketId,
-          hasToken: !!bluestakesToken,
-        });
         return;
       }
       try {
         setResponsesLoading(true);
-        console.log("Fetching responses for ticket:", ticketId);
         const responsesData = await bluestakesService.getResponsesByTicket(
           ticketId,
           bluestakesToken
         );
-        console.log("Received responses data:", responsesData);
         setResponses(responsesData);
       } catch (error) {
         console.error("Error fetching responses data:", error);
@@ -216,9 +211,6 @@ const TicketView = () => {
     }
   }
   const hasCoords = lat !== null && lng !== null;
-  const googleMapsUrl = hasCoords
-    ? `https://www.google.com/maps?q=${lat},${lng}&z=17&output=embed&style=feature:poi|visibility:off&markers=color:red%7C${lat},${lng}`
-    : null;
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -305,16 +297,12 @@ const TicketView = () => {
                 <h3 className="text-3xl font-medium mb-2 text-gray-600">
                   Map & Location
                 </h3>
-                {hasCoords ? (
-                  <iframe
-                    src={googleMapsUrl}
-                    title="Google Map"
-                    width="100%"
-                    height="350"
-                    style={{ border: 0 }}
-                    allowFullScreen={true}
-                    loading="lazy"
-                  ></iframe>
+                {hasCoords && currentTicket.work_area && currentTicket.work_area.type === 'Feature' && currentTicket.work_area.geometry ? (
+                  <Map 
+                    lat={lat} 
+                    lng={lng} 
+                    workAreaGeoJSON={currentTicket.work_area}
+                  />
                 ) : currentTicket.map_url ? (
                   <iframe
                     src={currentTicket.map_url}
@@ -355,7 +343,6 @@ const TicketView = () => {
                 Ticket Responses
               </h3>
               {(() => {
-                console.log("Rendering responses table with data:", responses);
                 return responsesLoading ? (
                   <div className="animate-pulse flex flex-col items-center p-4">
                     <div className="h-4 w-24 bg-blue-200 rounded mb-2"></div>
@@ -382,10 +369,6 @@ const TicketView = () => {
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {responses.map((response, index) => {
-                          console.log(
-                            `Rendering response row ${index}:`,
-                            response
-                          );
                           return (
                             <tr key={index} className="hover:bg-gray-50">
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

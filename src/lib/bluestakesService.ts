@@ -251,16 +251,13 @@ export const bluestakesService = {
         throw new Error(errorData.message || "Failed to fetch ticket responses");
       }
       const data = await response.json();
-      console.log('Raw response data:', JSON.stringify(data, null, 2));
       
       // Extract the responses array from the ticket object
       const ticketData = Array.isArray(data) ? data[0] : data;
       const responses = ticketData?.responses || [];
-      console.log('Extracted responses:', JSON.stringify(responses, null, 2));
       
       // Validate and normalize each response
       const validatedResponses = responses.map((resp, index) => {
-        console.log(`Validating response ${index}:`, resp);
         return {
           member_id: resp.member_id || 0,
           ticket: resp.ticket || ticketNumber,
@@ -279,7 +276,6 @@ export const bluestakesService = {
         };
       });
       
-      console.log('Validated responses:', JSON.stringify(validatedResponses, null, 2));
       return validatedResponses;
     } catch (error) {
       console.error(`Error fetching responses for ticket ${ticketNumber}:`, error);
