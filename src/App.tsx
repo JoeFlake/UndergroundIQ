@@ -16,6 +16,7 @@ import AdminPanel from "./pages/AdminPanel";
 import Projects from "./pages/Projects";
 import Tickets from "./pages/Tickets";
 import UnassignedTickets from "./pages/UnassignedTickets";
+import SetPassword from "./pages/SetPassword";
 
 const queryClient = new QueryClient();
 
@@ -91,6 +92,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route path="/set-password" element={<SetPassword />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

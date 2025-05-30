@@ -10,156 +10,122 @@ import {
   TableCell,
   TableHead,
   TableHeader,
-  TableRow
+  TableRow,
 } from "../components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "../components/ui/select";
 import { Skeleton } from "../components/ui/skeleton";
-import { Plus, Trash2 } from "lucide-react";
+import { supabase } from "../lib/supabaseClient";
 
-interface User {
-  user_id: string;
+interface Employee {
+  id: string;
   email: string;
-  project_ids: number[];
+  role: string;
+  created_at: string;
 }
-
-interface Project {
-  project_id: number;
-  project_name: string;
-}
-
-type DatabaseUser = {
-  user_id: string;
-  user_management: {
-    email: string;
-  };
-};
 
 export default function AdminPanel() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [users, setUsers] = useState<User[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [companyName, setCompanyName] = useState<string | null>(null);
+  const [companyId, setCompanyId] = useState<number | null>(null);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Add User Modal State
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserRole, setNewUserRole] = useState("user");
+  const [addingUser, setAddingUser] = useState(false);
+  const [addUserError, setAddUserError] = useState<string | null>(null);
+
+  // Fetch employees for the company
+  const fetchEmployees = async (companyId: number) => {
+    const { data: employeesData, error: employeesError } = await supabase
+      .from("users")
+      .select("id, email, role, created_at")
+      .eq("company_id", companyId);
+    if (employeesError) {
+      setError("Failed to fetch employees");
+      setLoading(false);
+      return;
+    }
+    setEmployees(employeesData);
+  };
+
   useEffect(() => {
-    const checkAdminStatus = async () => {
+    const checkAdminStatusAndFetch = async () => {
       if (!user) return;
-
-      const { data, error } = await supabase
-        .from("users_info")
-        .select("is_admin")
-        .eq("user_id", user.id)
+      // Check admin status
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("role, company_id")
+        .eq("id", user.id)
         .single();
-
-      if (error) {
-        console.error("Error checking admin status:", error);
-        setError("Failed to verify admin status");
+      if (userError || userData?.role !== "admin") {
         navigate("/login");
         return;
       }
-
-      if (!data?.is_admin) {
-        navigate("/login");
+      // Fetch company name
+      const companyId = userData.company_id;
+      if (!companyId) {
+        setError("No company assigned to this user.");
+        setLoading(false);
         return;
       }
-
-      await fetchUsers();
-      await fetchProjects();
+      setCompanyId(companyId);
+      const { data: companyData, error: companyError } = await supabase
+        .from("companies")
+        .select("name")
+        .eq("id", companyId)
+        .single();
+      if (companyError) {
+        setError("Failed to fetch company name");
+        setLoading(false);
+        return;
+      }
+      setCompanyName(companyData.name);
+      // Fetch all employees of this company
+      await fetchEmployees(companyId);
       setLoading(false);
     };
-
-    checkAdminStatus();
+    checkAdminStatusAndFetch();
+    // eslint-disable-next-line
   }, [user, navigate]);
 
-  const fetchUsers = async () => {
-    const { data: usersData, error: usersError } = await supabase.from("user_management").select(`
-        user_id,
-        email
-      `);
+  // Add user handler
+  const handleAddUser = async () => {
+    if (!companyId) return;
+    setAddingUser(true);
+    setAddUserError(null);
 
-    if (usersError) {
-      console.error("Error fetching users:", usersError);
-      setError("Failed to fetch users");
-      return;
-    }
-
-    const { data: associationsData, error: associationsError } = await supabase
-      .from("users-projects")
-      .select("user_id, project_id");
-
-    if (associationsError) {
-      console.error("Error fetching user-project associations:", associationsError);
-      setError("Failed to fetch user-project associations");
-      return;
-    }
-
-    // Group project IDs by user
-    const userProjects = associationsData.reduce((acc, curr) => {
-      if (!acc[curr.user_id]) {
-        acc[curr.user_id] = [];
+    try {
+      const response = await fetch(
+        "https://kvlfpyfvifspllbtafnj.functions.supabase.co/invite-user",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: newUserEmail.trim(),
+            role: newUserRole,
+            company_id: companyId,
+          }),
+        }
+      );
+      const result = await response.json();
+      if (!response.ok) {
+        setAddUserError(result.error || "Failed to invite user.");
+        setAddingUser(false);
+        return;
       }
-      acc[curr.user_id].push(curr.project_id);
-      return acc;
-    }, {} as Record<string, number[]>);
-
-    // Combine user data with their project IDs
-    const usersWithProjects = usersData.map((user) => ({
-      user_id: user.user_id,
-      email: user.email,
-      project_ids: userProjects[user.user_id] || []
-    }));
-
-    setUsers(usersWithProjects);
-  };
-
-  const fetchProjects = async () => {
-    const { data, error } = await supabase.from("projects").select("project_id, project_name");
-
-    if (error) {
-      console.error("Error fetching projects:", error);
-      setError("Failed to fetch projects");
-      return;
+      setShowAddUser(false);
+      setNewUserEmail("");
+      setNewUserRole("user");
+      setAddingUser(false);
+      await fetchEmployees(companyId);
+    } catch (err) {
+      setAddUserError("Unexpected error occurred.");
+      setAddingUser(false);
     }
-
-    setProjects(data);
-  };
-
-  const handleAddProject = async (userId: string, projectId: number) => {
-    const { error } = await supabase.from("users-projects").insert({
-      user_id: userId,
-      project_id: projectId
-    });
-
-    if (error) {
-      console.error("Error adding project to user:", error);
-      setError("Failed to add project to user");
-      return;
-    }
-
-    await fetchUsers();
-  };
-
-  const handleRemoveProject = async (userId: string, projectId: number) => {
-    const { error } = await supabase
-      .from("users-projects")
-      .delete()
-      .eq("user_id", userId)
-      .eq("project_id", projectId);
-
-    if (error) {
-      console.error("Error removing project from user:", error);
-      setError("Failed to remove project from user");
-      return;
-    }
-
-    await fetchUsers();
   };
 
   if (loading) {
@@ -183,65 +149,31 @@ export default function AdminPanel() {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       <div className="min-h-screen bg-gray-50 flex flex-col items-center p-4">
-        <Card className="w-full max-w-6xl animate-fade-in">
+        <Card className="w-full max-w-3xl animate-fade-in">
           <CardContent className="pt-6">
-            <h2 className="text-2xl font-bold mb-6">User Project Management</h2>
+            <h2 className="text-2xl font-bold mb-2">Admin Panel</h2>
+            <h3 className="text-lg font-semibold mb-6">
+              Company: <span className="text-blue-700">{companyName}</span>
+            </h3>
+            <Button className="mb-4" onClick={() => setShowAddUser(true)}>
+              Add User
+            </Button>
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Projects</TableHead>
-                    <TableHead>Add Project</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Created At</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((user) => (
-                    <TableRow key={user.user_id}>
-                      <TableCell className="font-medium">{user.email}</TableCell>
+                  {employees.map((emp) => (
+                    <TableRow key={emp.id}>
+                      <TableCell>{emp.email}</TableCell>
+                      <TableCell>{emp.role}</TableCell>
                       <TableCell>
-                        <div className="flex flex-wrap gap-2">
-                          {user.project_ids.map((projectId) => {
-                            const project = projects.find((p) => p.project_id === projectId);
-                            return (
-                              <div
-                                key={projectId}
-                                className="flex items-center bg-gray-100 px-2 py-1 rounded-md text-sm"
-                              >
-                                {project?.project_name}
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-4 w-4 p-0 ml-2 hover:bg-transparent"
-                                  onClick={() => handleRemoveProject(user.user_id, projectId)}
-                                >
-                                  <Trash2 className="h-3 w-3 text-red-500" />
-                                </Button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          onValueChange={(value) => handleAddProject(user.user_id, parseInt(value))}
-                        >
-                          <SelectTrigger className="w-[200px]">
-                            <SelectValue placeholder="Select project" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {projects
-                              .filter((project) => !user.project_ids.includes(project.project_id))
-                              .map((project) => (
-                                <SelectItem
-                                  key={project.project_id}
-                                  value={project.project_id.toString()}
-                                >
-                                  {project.project_name}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
+                        {new Date(emp.created_at).toLocaleString()}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -250,6 +182,56 @@ export default function AdminPanel() {
             </div>
           </CardContent>
         </Card>
+        {/* Add User Modal */}
+        {showAddUser && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
+            <div className="bg-white rounded-lg shadow-lg p-6 w-96">
+              <h2 className="text-xl font-bold mb-4">Add User</h2>
+              {addUserError && (
+                <p className="text-red-500 mb-2">{addUserError}</p>
+              )}
+              <div className="mb-4">
+                <label className="block mb-1 font-medium">Email</label>
+                <input
+                  type="email"
+                  className="w-full border rounded px-3 py-2"
+                  value={newUserEmail}
+                  onChange={(e) => setNewUserEmail(e.target.value)}
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block mb-1 font-medium">Role</label>
+                <select
+                  className="w-full border rounded px-3 py-2"
+                  value={newUserRole}
+                  onChange={(e) => setNewUserRole(e.target.value)}
+                >
+                  <option value="user">User</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowAddUser(false);
+                    setAddUserError(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleAddUser}
+                  disabled={
+                    addingUser || !newUserEmail || !newUserEmail.includes("@")
+                  }
+                >
+                  {addingUser ? "Adding..." : "Add User"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

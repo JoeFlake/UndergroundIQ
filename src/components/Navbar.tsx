@@ -1,13 +1,39 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "./ui/button";
-import { User, Folder, Home as HomeIcon, CheckSquare } from "lucide-react";
+import {
+  User,
+  Folder,
+  Home as HomeIcon,
+  CheckSquare,
+  Shield,
+} from "lucide-react";
 import logo from "../assets/images/LogoWide.png";
+import { useEffect, useState } from "react";
+import { supabase } from "../lib/supabaseClient";
 
 export function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, signOut } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const fetchRole = async () => {
+      if (user) {
+        const { data, error } = await supabase
+          .from("users")
+          .select("role")
+          .eq("id", user.id)
+          .single();
+        if (data?.role === "admin") setIsAdmin(true);
+        else setIsAdmin(false);
+      } else {
+        setIsAdmin(false);
+      }
+    };
+    fetchRole();
+  }, [user]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -62,6 +88,19 @@ export function Navbar() {
                 <CheckSquare className="h-4 w-4 mr-2" />
                 To Do
               </button>
+              {isAdmin && (
+                <button
+                  onClick={() => navigate("/admin")}
+                  className={`border-b-2 px-1 pt-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-gray-200 focus:ring-opacity-75 rounded-sm inline-flex items-center ${
+                    isActive("/admin")
+                      ? "border-orange-500 text-orange-600"
+                      : "border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-900"
+                  }`}
+                >
+                  <Shield className="h-4 w-4 mr-2" />
+                  Admin Panel
+                </button>
+              )}
             </div>
           </div>
           <div className="flex items-center space-x-4">

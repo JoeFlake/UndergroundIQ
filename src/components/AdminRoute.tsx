@@ -2,6 +2,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { Skeleton } from "./ui/skeleton";
 import { useEffect, useState } from "react";
+import { supabase } from "../lib/supabaseClient";
 
 interface AdminRouteProps {
   children: React.ReactNode;
@@ -21,9 +22,9 @@ export function AdminRoute({ children }: AdminRouteProps) {
 
       try {
         const { data, error } = await supabase
-          .from("users_info")
-          .select("is_admin")
-          .eq("user_id", user.id)
+          .from("users")
+          .select("role")
+          .eq("id", user.id)
           .single();
 
         if (error) {
@@ -32,7 +33,7 @@ export function AdminRoute({ children }: AdminRouteProps) {
           return;
         }
 
-        setIsAdmin(data?.is_admin || false);
+        setIsAdmin(data?.role === "admin");
       } catch (error) {
         console.error("Error in checkAdminStatus:", error);
         setIsAdmin(false);

@@ -1,12 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 
-// Use process.env for Node.js compatibility, fallback to import.meta.env for Vite
-const supabaseUrl = (typeof process !== 'undefined' ? process.env.VITE_SUPABASE_URL : import.meta.env.VITE_SUPABASE_URL) as string;
-const supabaseAnonKey = (typeof process !== 'undefined' ? process.env.VITE_SUPABASE_ANON_KEY : import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
-}
+const supabaseUrl = "https://kvlfpyfvifspllbtafnj.supabase.co";
+const supabaseAnonKey =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt2bGZweWZ2aWZzcGxsYnRhZm5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE5NjczNTksImV4cCI6MjA1NzU0MzM1OX0.Kjo7ersYhaPxFCIbYP2YVaSNGhCso3aMvnh50nIfwiM";
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
