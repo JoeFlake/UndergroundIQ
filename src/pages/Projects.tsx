@@ -37,43 +37,60 @@ export default function Projects() {
 
   async function fetchUserCompany() {
     if (!user) return;
-    
+
     // First, let's see what user data we have
     const { data: userData, error: userError } = await supabase
       .from("users")
       .select("*")
       .eq("id", user.id)
       .single();
-    
+
     console.log("User data:", userData);
-    
+
     // Then try to get company data
     const { data: companyData, error: companyError } = await supabase
       .from("companies")
       .select("*")
       .eq("id", userData?.company_id)
       .single();
-    
+
     console.log("Company data:", companyData);
     console.log("Company error:", companyError);
-    
+
     if (!companyError && companyData) {
       setCompanyName(companyData.name);
     } else {
-      console.log("Failed to get company name. User data:", JSON.stringify(userData, null, 2));
+      console.log(
+        "Failed to get company name. User data:",
+        JSON.stringify(userData, null, 2)
+      );
     }
   }
 
   async function fetchProjects() {
     setLoading(true);
+    // Get user's company_id
+    const { data: userProfile, error: userError } = await supabase
+      .from("users")
+      .select("company_id")
+      .eq("id", user.id)
+      .single();
+    if (userError || !userProfile?.company_id) {
+      setProjects([]);
+      setLoading(false);
+      return;
+    }
+    const companyId = userProfile.company_id;
+    // Fetch projects for the company
     const { data, error } = await supabase
-      .from("projects")
-      .select("*, user_projects!inner(user_id)")
-      .eq("user_projects.user_id", user.id);
+      .from("company_projects")
+      .select("projects(*)")
+      .eq("company_id", companyId);
     if (error) {
       setProjects([]);
     } else {
-      setProjects(data);
+      // Flatten the projects array
+      setProjects((data || []).map((row) => row.projects));
     }
     setLoading(false);
   }
@@ -103,33 +120,40 @@ export default function Projects() {
       setCreating(false);
       return;
     }
-    // Insert the new project and get its id
+    // Get user's company_id
+    const { data: userProfile, error: userError } = await supabase
+      .from("users")
+      .select("company_id")
+      .eq("id", user.id)
+      .single();
+    if (userError || !userProfile?.company_id) {
+      setCreateError("Could not determine company");
+      setCreating(false);
+      return;
+    }
+    const companyId = userProfile.company_id;
+    // Insert the new project
     const { data, error } = await supabase
       .from("projects")
       .insert([{ name: newProjectName.trim(), created_by: user.id }])
-      .select(); // get the inserted project back
-
+      .select();
     if (error) {
       setCreateError(error.message);
       setCreating(false);
       return;
     }
-
     if (data && data.length > 0) {
       const newProject = data[0];
-      // Assign the current user to the new project
-      const { error: userProjError } = await supabase
-        .from("user_projects")
-        .insert([{ user_id: user.id, project_id: newProject.id }]);
-      if (userProjError) {
-        setCreateError(
-          "Project created, but failed to assign user to project."
-        );
+      // Link the project to the company
+      const { error: cpError } = await supabase
+        .from("company_projects")
+        .insert([{ company_id: companyId, project_id: newProject.id }]);
+      if (cpError) {
+        setCreateError("Project created, but failed to link to company.");
         setCreating(false);
         return;
       }
     }
-
     setShowCreateModal(false);
     setNewProjectName("");
     setCreating(false);

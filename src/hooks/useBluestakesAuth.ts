@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabaseClient';
-import { useAuth } from '../contexts/AuthContext';
+import { useState, useEffect } from "react";
+import { supabase } from "../lib/supabaseClient";
+import { useAuth } from "../contexts/AuthContext";
 
 interface BluestakesAuthState {
   bluestakesToken: string | null;
@@ -44,25 +44,40 @@ export function useBluestakesAuth(): BluestakesAuthState {
     setError(null);
 
     try {
-      // Get Blue Stakes credentials for the current user
+      // Get the user's company_id
       const { data: userProfile, error: userError } = await supabase
         .from("users")
-        .select("bluestakes_username, bluestakes_password")
+        .select("company_id")
         .eq("id", user.id)
         .single();
 
       if (userError) throw userError;
-      if (!userProfile?.bluestakes_username || !userProfile?.bluestakes_password) {
-        throw new Error("Blue Stakes credentials not found");
+      if (!userProfile?.company_id) {
+        throw new Error("User does not have a company_id");
+      }
+
+      // Get Blue Stakes credentials from the companies table
+      const { data: company, error: companyError } = await supabase
+        .from("companies")
+        .select("bluestakes_username, bluestakes_password")
+        .eq("id", userProfile.company_id)
+        .single();
+
+      if (companyError) throw companyError;
+      if (!company?.bluestakes_username || !company?.bluestakes_password) {
+        throw new Error("Company Blue Stakes credentials not found");
       }
 
       const token = await loginToBluestakes(
-        userProfile.bluestakes_username,
-        userProfile.bluestakes_password
+        company.bluestakes_username,
+        company.bluestakes_password
       );
       setBluestakesToken(token);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to authenticate with Blue Stakes";
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Failed to authenticate with Blue Stakes";
       setError(errorMessage);
       setBluestakesToken(null);
     } finally {
@@ -85,4 +100,4 @@ export function useBluestakesAuth(): BluestakesAuthState {
     error,
     refreshToken,
   };
-} 
+}

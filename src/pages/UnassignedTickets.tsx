@@ -2,7 +2,10 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { Navbar } from "../components/Navbar";
 import { useBluestakesAuth } from "../hooks/useBluestakesAuth";
-import { bluestakesService, type BlueStakesTicket } from "../lib/bluestakesService";
+import {
+  bluestakesService,
+  type BlueStakesTicket,
+} from "../lib/bluestakesService";
 import {
   Card,
   CardContent,
@@ -23,7 +26,13 @@ import { Input } from "../components/ui/input";
 import { useAuth } from "../contexts/AuthContext";
 import type { Project } from "../types";
 import { useToast } from "../components/ui/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "../components/ui/dialog";
 
 // Remove the local Ticket interface and use BlueStakesTicket instead
 type Ticket = BlueStakesTicket;
@@ -75,9 +84,15 @@ interface ProjectData {
 export default function UnassignedTickets() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { bluestakesToken, isLoading: authLoading, error: authError } = useBluestakesAuth();
+  const {
+    bluestakesToken,
+    isLoading: authLoading,
+    error: authError,
+  } = useBluestakesAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [ticketsNeedingUpdate, setTicketsNeedingUpdate] = useState<Ticket[]>([]);
+  const [ticketsNeedingUpdate, setTicketsNeedingUpdate] = useState<Ticket[]>(
+    []
+  );
   const [loading, setLoading] = useState(true);
   const [loadingUpdates, setLoadingUpdates] = useState(true);
   const [error, setError] = useState<string>("");
@@ -95,22 +110,26 @@ export default function UnassignedTickets() {
   const getProjectForTicket = async (ticketNumber: string) => {
     try {
       const { data, error } = await supabase
-        .from('project_tickets')
-        .select('project_id, projects(name)')
-        .eq('ticket_number', ticketNumber)
+        .from("project_tickets")
+        .select("project_id, projects(name)")
+        .eq("ticket_number", ticketNumber)
         .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') throw error;
-      const project = Array.isArray(data?.projects) ? data.projects[0] : data?.projects;
-      return project?.name || 'Unassigned';
+      if (error && error.code !== "PGRST116") throw error;
+      const project = Array.isArray(data?.projects)
+        ? data.projects[0]
+        : data?.projects;
+      return project?.name || "Unassigned";
     } catch (error) {
-      console.error('Error fetching project for ticket:', error);
-      return 'Unassigned';
+      console.error("Error fetching project for ticket:", error);
+      return "Unassigned";
     }
   };
 
   // Add state for project names
-  const [ticketProjects, setTicketProjects] = useState<Record<string, string>>({});
+  const [ticketProjects, setTicketProjects] = useState<Record<string, string>>(
+    {}
+  );
 
   // First effect to fetch unassigned tickets
   useEffect(() => {
@@ -124,7 +143,8 @@ export default function UnassignedTickets() {
       setError("");
       try {
         // Fetch all tickets
-        const allTickets = await bluestakesService.getAllTickets(bluestakesToken);
+        const allTickets =
+          await bluestakesService.getAllTickets(bluestakesToken);
 
         // Fetch all assigned ticket numbers from project_tickets
         const {
@@ -150,26 +170,29 @@ export default function UnassignedTickets() {
         const updatePromises = unassignedTickets.map(async (ticket) => {
           try {
             // Get detailed ticket info including original ticket
-            const ticketDetails = await bluestakesService.getTicketByNumber(ticket.ticket, bluestakesToken);
-            
+            const ticketDetails = await bluestakesService.getTicketByNumber(
+              ticket.ticket,
+              bluestakesToken
+            );
+
             if (ticketDetails.original_ticket) {
               // Check if the original ticket is assigned to any projects
-              const { data: originalAssignments, error: originalError } = await supabase
-                .from('project_tickets')
-                .select('project_id')
-                .eq('ticket_number', ticketDetails.original_ticket);
+              const { data: originalAssignments, error: originalError } =
+                await supabase
+                  .from("project_tickets")
+                  .select("project_id")
+                  .eq("ticket_number", ticketDetails.original_ticket);
 
               if (originalError) throw originalError;
 
               if (originalAssignments && originalAssignments.length > 0) {
                 // Create new assignments for each project the original ticket was assigned to
-                const assignmentPromises = originalAssignments.map(assignment => 
-                  supabase
-                    .from('project_tickets')
-                    .insert({
+                const assignmentPromises = originalAssignments.map(
+                  (assignment) =>
+                    supabase.from("project_tickets").insert({
                       project_id: assignment.project_id,
                       ticket_number: ticket.ticket,
-                      replace_by_date: ticketDetails.replace_by_date
+                      replace_by_date: ticketDetails.replace_by_date,
                     })
                 );
 
@@ -188,20 +211,20 @@ export default function UnassignedTickets() {
         const assignmentResults = await Promise.all(updatePromises);
 
         // Fetch updated assigned tickets after potential updates
-        const {
-          data: updatedAssigned,
-          error: updatedAssignedError,
-        } = await supabase.from("project_tickets").select("ticket_number");
-        
+        const { data: updatedAssigned, error: updatedAssignedError } =
+          await supabase.from("project_tickets").select("ticket_number");
+
         if (updatedAssignedError) throw updatedAssignedError;
-        
+
         const updatedAssignedTicketNumbers = new Set(
           (updatedAssigned || []).map((row) => row.ticket_number)
         );
 
         // Filter out newly assigned tickets
         const filteredTickets = unassignedTickets.filter(
-          (ticket, index) => !assignmentResults[index] && !updatedAssignedTicketNumbers.has(ticket.ticket)
+          (ticket, index) =>
+            !assignmentResults[index] &&
+            !updatedAssignedTicketNumbers.has(ticket.ticket)
         );
 
         setTickets(filteredTickets);
@@ -258,12 +281,15 @@ export default function UnassignedTickets() {
 
       setLoadingUpdates(true);
       try {
-        const updateTickets = await bluestakesService.getTicketsNeedingUpdate(bluestakesToken);
+        const updateTickets =
+          await bluestakesService.getTicketsNeedingUpdate(bluestakesToken);
         setTicketsNeedingUpdate(updateTickets);
       } catch (err: unknown) {
         toast({
           title: "Error",
-          description: isErrorWithMessage(err) ? err.message : "Failed to fetch tickets needing updates",
+          description: isErrorWithMessage(err)
+            ? err.message
+            : "Failed to fetch tickets needing updates",
           variant: "destructive",
         });
       } finally {
@@ -316,7 +342,10 @@ export default function UnassignedTickets() {
     setAssignSuccess("");
     try {
       // Fetch ticket details to get replace_by_date
-      const ticketDetails = await bluestakesService.getTicketByNumber(assigningTicket.ticket, bluestakesToken);
+      const ticketDetails = await bluestakesService.getTicketByNumber(
+        assigningTicket.ticket,
+        bluestakesToken
+      );
 
       const { error } = await supabase.from("project_tickets").insert([
         {
@@ -349,7 +378,7 @@ export default function UnassignedTickets() {
     try {
       // Copy ticket number to clipboard
       await navigator.clipboard.writeText(ticket.ticket);
-      
+
       // Show success toast
       toast({
         title: "Ticket Number Copied",
@@ -358,7 +387,7 @@ export default function UnassignedTickets() {
 
       // Navigate to external URL
       const ticketUrl = `https://newtin.bluestakes.org/newtinweb/UTAH_ticketentry.html`;
-      window.open(ticketUrl, '_blank');
+      window.open(ticketUrl, "_blank");
     } catch (error) {
       toast({
         title: "Error",
@@ -370,27 +399,31 @@ export default function UnassignedTickets() {
 
   const formatStreetAddress = (ticket: Ticket) => {
     const parts = [];
-    
+
     // Handle street address with from/to if available
     const fromAddress = ticket.st_from_address?.trim();
     const toAddress = ticket.st_to_address?.trim();
-    
-    if (fromAddress && toAddress && fromAddress !== '0' && toAddress !== '0') {
+
+    if (fromAddress && toAddress && fromAddress !== "0" && toAddress !== "0") {
       if (fromAddress === toAddress) {
         parts.push(`${fromAddress} ${ticket.street?.trim()}`);
       } else {
-        parts.push(`${ticket.street?.trim()} from ${fromAddress} to ${toAddress}`);
+        parts.push(
+          `${ticket.street?.trim()} from ${fromAddress} to ${toAddress}`
+        );
       }
     } else if (ticket.cross1?.trim() && ticket.cross2?.trim()) {
       // If no from/to addresses, show cross streets
-      parts.push(`${ticket.street?.trim()} from ${ticket.cross1.trim()} to ${ticket.cross2.trim()}`);
+      parts.push(
+        `${ticket.street?.trim()} from ${ticket.cross1.trim()} to ${ticket.cross2.trim()}`
+      );
     } else if (ticket.street?.trim()) {
       // Fallback to just street name if no other location data
       parts.push(ticket.street.trim());
     }
-    
+
     if (ticket.place?.trim()) parts.push(ticket.place.trim());
-    return parts.join(', ');
+    return parts.join(", ");
   };
 
   // Add function to create new project
@@ -418,22 +451,27 @@ export default function UnassignedTickets() {
       // Add user to project
       const { error: userProjectError } = await supabase
         .from("user_projects")
-        .insert([{ 
-          user_id: user.id, 
-          project_id: newProject.id 
-        }]);
+        .insert([
+          {
+            user_id: user.id,
+            project_id: newProject.id,
+          },
+        ]);
 
       if (userProjectError) throw userProjectError;
 
       // Update projects list
-      setProjects(prev => [...prev, { 
-        project_id: newProject.id, 
-        project_name: newProject.name 
-      }]);
+      setProjects((prev) => [
+        ...prev,
+        {
+          project_id: newProject.id,
+          project_name: newProject.name,
+        },
+      ]);
 
       // Select the new project
       setSelectedProject(newProject.id.toString());
-      
+
       toast({
         title: "Success",
         description: "Project created successfully",
@@ -444,7 +482,9 @@ export default function UnassignedTickets() {
     } catch (error) {
       toast({
         title: "Error",
-        description: isErrorWithMessage(error) ? error.message : "Failed to create project",
+        description: isErrorWithMessage(error)
+          ? error.message
+          : "Failed to create project",
         variant: "destructive",
       });
     } finally {
@@ -523,7 +563,9 @@ export default function UnassignedTickets() {
                             <span className="text-gray-400">Loading...</span>
                           )}
                         </TableCell>
-                        <TableCell>{formatDate(ticket.replace_by_date).split(',')[0]}</TableCell>
+                        <TableCell>
+                          {formatDate(ticket.replace_by_date).split(",")[0]}
+                        </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
                             <Button
@@ -544,9 +586,7 @@ export default function UnassignedTickets() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>
-              Unassigned Tickets
-            </CardTitle>
+            <CardTitle>Unassigned Tickets</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
@@ -574,9 +614,7 @@ export default function UnassignedTickets() {
                       <TableCell>{ticket.ticket}</TableCell>
                       <TableCell>{ticket.contact}</TableCell>
                       <TableCell>{ticket.done_for}</TableCell>
-                      <TableCell>
-                        {formatStreetAddress(ticket)}
-                      </TableCell>
+                      <TableCell>{formatStreetAddress(ticket)}</TableCell>
                       <TableCell>
                         <Button
                           size="sm"
@@ -609,7 +647,10 @@ export default function UnassignedTickets() {
                   >
                     <option value="">-- Select a project --</option>
                     {projects.map((project) => (
-                      <option key={project.project_id} value={project.project_id}>
+                      <option
+                        key={project.project_id}
+                        value={project.project_id}
+                      >
                         {project.project_name}
                       </option>
                     ))}
@@ -649,7 +690,10 @@ export default function UnassignedTickets() {
         )}
 
         {/* New Project Modal */}
-        <Dialog open={isNewProjectModalOpen} onOpenChange={setIsNewProjectModalOpen}>
+        <Dialog
+          open={isNewProjectModalOpen}
+          onOpenChange={setIsNewProjectModalOpen}
+        >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create New Project</DialogTitle>

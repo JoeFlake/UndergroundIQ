@@ -26,11 +26,30 @@ import {
 import { MoreVertical, Plus } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useBluestakesAuth } from "@/hooks/useBluestakesAuth";
-import { bluestakesService, type BlueStakesTicket } from "../lib/bluestakesService";
+import {
+  bluestakesService,
+  type BlueStakesTicket,
+} from "../lib/bluestakesService";
 import { ArrowLeft } from "lucide-react";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Trash2 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { Label } from "@/components/ui/label";
@@ -53,12 +72,7 @@ function getStatus(ticket: BlueStakesTicket | undefined) {
 
 function formatAddress(ticket: BlueStakesTicket | undefined) {
   if (!ticket) return "-";
-  const parts = [
-    ticket.place,
-    ticket.city,
-    ticket.state,
-    ticket.zip,
-  ];
+  const parts = [ticket.place, ticket.city, ticket.state, ticket.zip];
   return parts.filter(Boolean).join(", ");
 }
 
@@ -66,10 +80,10 @@ function formatDate(dateString: string | undefined) {
   if (!dateString) return "-";
   try {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'long',
-      month: 'long', 
-      day: 'numeric'
+    return date.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
     });
   } catch {
     return dateString;
@@ -89,7 +103,11 @@ function isErrorWithMessage(err: unknown): err is { message: string } {
 export default function Tickets() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { bluestakesToken, isLoading: authLoading, error: authError } = useBluestakesAuth();
+  const {
+    bluestakesToken,
+    isLoading: authLoading,
+    error: authError,
+  } = useBluestakesAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [tickets, setTickets] = useState<ProjectTicket[]>([]);
@@ -101,7 +119,6 @@ export default function Tickets() {
   const [newTicketNumber, setNewTicketNumber] = useState("");
   const [isAddingTicket, setIsAddingTicket] = useState(false);
   const [isEnrichingTickets, setIsEnrichingTickets] = useState(false);
-  
 
   useEffect(() => {
     async function fetchTickets() {
@@ -134,7 +151,10 @@ export default function Tickets() {
 
         // If we have a BlueStakes token, enrich the tickets with API data
         if (bluestakesToken) {
-          await enrichTicketsWithBlueStakesData(projectTickets || [], bluestakesToken);
+          await enrichTicketsWithBlueStakesData(
+            projectTickets || [],
+            bluestakesToken
+          );
         }
       } catch (err: unknown) {
         setError(
@@ -167,20 +187,29 @@ export default function Tickets() {
     navigate(url);
   };
 
-  const enrichTicketsWithBlueStakesData = async (projectTickets: ProjectTicket[], token: string) => {
+  const enrichTicketsWithBlueStakesData = async (
+    projectTickets: ProjectTicket[],
+    token: string
+  ) => {
     setIsEnrichingTickets(true);
     try {
       // Fetch all tickets from BlueStakes in parallel
       const enrichedTickets = await Promise.all(
         projectTickets.map(async (ticket) => {
           try {
-            const bluestakesData = await bluestakesService.getTicketByNumber(ticket.ticket_number, token);
+            const bluestakesData = await bluestakesService.getTicketByNumber(
+              ticket.ticket_number,
+              token
+            );
             return {
               ...ticket,
               bluestakes_data: bluestakesData,
             };
           } catch (err) {
-            console.error(`Failed to fetch BlueStakes data for ticket ${ticket.ticket_number}:`, err);
+            console.error(
+              `Failed to fetch BlueStakes data for ticket ${ticket.ticket_number}:`,
+              err
+            );
             return ticket;
           }
         })
@@ -221,7 +250,10 @@ export default function Tickets() {
       setTickets(projectTickets || []);
 
       // Enrich with BlueStakes data
-      await enrichTicketsWithBlueStakesData(projectTickets || [], bluestakesToken);
+      await enrichTicketsWithBlueStakesData(
+        projectTickets || [],
+        bluestakesToken
+      );
     } catch (err) {
       setError(
         isErrorWithMessage(err) ? err.message : "Failed to refresh tickets"
@@ -267,27 +299,31 @@ export default function Tickets() {
   function formatStreetAddress(ticket: BlueStakesTicket | undefined) {
     if (!ticket) return "-";
     const parts = [];
-    
+
     // Handle street address with from/to if available
     const fromAddress = ticket.st_from_address?.trim();
     const toAddress = ticket.st_to_address?.trim();
-    
-    if (fromAddress && toAddress && fromAddress !== '0' && toAddress !== '0') {
+
+    if (fromAddress && toAddress && fromAddress !== "0" && toAddress !== "0") {
       if (fromAddress === toAddress) {
         parts.push(`${fromAddress} ${ticket.street?.trim()}`);
       } else {
-        parts.push(`${ticket.street?.trim()} from ${fromAddress} to ${toAddress}`);
+        parts.push(
+          `${ticket.street?.trim()} from ${fromAddress} to ${toAddress}`
+        );
       }
     } else if (ticket.cross1?.trim() && ticket.cross2?.trim()) {
       // If no from/to addresses, show cross streets
-      parts.push(`${ticket.street?.trim()} from ${ticket.cross1.trim()} to ${ticket.cross2.trim()}`);
+      parts.push(
+        `${ticket.street?.trim()} from ${ticket.cross1.trim()} to ${ticket.cross2.trim()}`
+      );
     } else if (ticket.street?.trim()) {
       // Fallback to just street name if no other location data
       parts.push(ticket.street.trim());
     }
-    
+
     if (ticket.place?.trim()) parts.push(ticket.place.trim());
-    return parts.join(', ');
+    return parts.join(", ");
   }
 
   const handleAddTicket = async () => {
@@ -312,7 +348,10 @@ export default function Tickets() {
       }
 
       // Verify ticket exists and is valid
-      const ticket = await bluestakesService.getTicketByNumber(ticketNumber, bluestakesToken);
+      const ticket = await bluestakesService.getTicketByNumber(
+        ticketNumber,
+        bluestakesToken
+      );
       if (!ticket) {
         throw new Error("Ticket not found in BlueStakes");
       }
@@ -325,7 +364,8 @@ export default function Tickets() {
         .eq("ticket_number", ticketNumber)
         .single();
 
-      if (checkError && checkError.code !== "PGRST116") { // PGRST116 is "no rows returned"
+      if (checkError && checkError.code !== "PGRST116") {
+        // PGRST116 is "no rows returned"
         throw checkError;
       }
 
@@ -334,21 +374,26 @@ export default function Tickets() {
       }
 
       // Add ticket to project
-      const { error: insertError } = await supabase.from("project_tickets").insert([
-        {
-          project_id: projectId,
-          ticket_number: ticketNumber,
-        },
-      ]);
+      const { error: insertError } = await supabase
+        .from("project_tickets")
+        .insert([
+          {
+            project_id: projectId,
+            ticket_number: ticketNumber,
+          },
+        ]);
 
       if (insertError) throw insertError;
 
       // Add the new ticket to the state with its BlueStakes data
-      setTickets(prev => [...prev, {
-        ticket_number: ticketNumber,
-        project_id: projectId,
-        bluestakes_data: ticket
-      }]);
+      setTickets((prev) => [
+        ...prev,
+        {
+          ticket_number: ticketNumber,
+          project_id: projectId,
+          bluestakes_data: ticket,
+        },
+      ]);
 
       toast({
         title: "Success",
@@ -360,7 +405,9 @@ export default function Tickets() {
     } catch (err) {
       toast({
         title: "Error",
-        description: isErrorWithMessage(err) ? err.message : "Failed to add ticket",
+        description: isErrorWithMessage(err)
+          ? err.message
+          : "Failed to add ticket",
         variant: "destructive",
       });
     } finally {
@@ -368,7 +415,7 @@ export default function Tickets() {
     }
   };
 
-  const activeTickets = tickets.filter(ticket => {
+  const activeTickets = tickets.filter((ticket) => {
     if (!ticket.bluestakes_data) return true; // Show tickets that are still loading
     return getStatus(ticket.bluestakes_data) === "Active";
   });
@@ -397,10 +444,10 @@ export default function Tickets() {
             </CardHeader>
             <CardContent className="text-center">
               <div className="flex flex-col items-center justify-center h-full">
-                <h2 className="text-2xl font-semibold mb-2">Authentication Error</h2>
-                <p className="text-muted-foreground">
-                  {authError}
-                </p>
+                <h2 className="text-2xl font-semibold mb-2">
+                  Authentication Error
+                </h2>
+                <p className="text-muted-foreground">{authError}</p>
               </div>
             </CardContent>
           </Card>
@@ -422,7 +469,9 @@ export default function Tickets() {
             <div className="flex items-center gap-2">
               <CardTitle>Tickets for {projectName || "Project"}</CardTitle>
               {isEnrichingTickets && (
-                <span className="text-sm text-muted-foreground">(Updating ticket data...)</span>
+                <span className="text-sm text-muted-foreground">
+                  (Updating ticket data...)
+                </span>
               )}
             </div>
             <DropdownMenu
@@ -458,8 +507,9 @@ export default function Tickets() {
                   <AlertDialogHeader>
                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This action cannot be undone. This will permanently delete the project
-                      and remove all associated tickets from your project.
+                      This action cannot be undone. This will permanently delete
+                      the project and remove all associated tickets from your
+                      project.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -499,8 +549,13 @@ export default function Tickets() {
                   {activeTickets.map((ticket) => (
                     <TableRow
                       key={ticket.ticket_number}
-                      onClick={() => ticket.bluestakes_data && handleRowClick(ticket.bluestakes_data)}
-                      style={{ cursor: ticket.bluestakes_data ? "pointer" : "default" }}
+                      onClick={() =>
+                        ticket.bluestakes_data &&
+                        handleRowClick(ticket.bluestakes_data)
+                      }
+                      style={{
+                        cursor: ticket.bluestakes_data ? "pointer" : "default",
+                      }}
                       className={!ticket.bluestakes_data ? "opacity-50" : ""}
                     >
                       <TableCell>{ticket.ticket_number}</TableCell>
@@ -516,21 +571,27 @@ export default function Tickets() {
                             {getStatus(ticket.bluestakes_data)}
                           </span>
                         ) : (
-                          <span className="text-muted-foreground">Loading...</span>
+                          <span className="text-muted-foreground">
+                            Loading...
+                          </span>
                         )}
                       </TableCell>
                       <TableCell>
                         {ticket.bluestakes_data ? (
                           formatDate(ticket.bluestakes_data.replace_by_date)
                         ) : (
-                          <span className="text-muted-foreground">Loading...</span>
+                          <span className="text-muted-foreground">
+                            Loading...
+                          </span>
                         )}
                       </TableCell>
                       <TableCell>
                         {ticket.bluestakes_data ? (
                           formatStreetAddress(ticket.bluestakes_data)
                         ) : (
-                          <span className="text-muted-foreground">Loading...</span>
+                          <span className="text-muted-foreground">
+                            Loading...
+                          </span>
                         )}
                       </TableCell>
                     </TableRow>
@@ -541,7 +602,10 @@ export default function Tickets() {
           </CardContent>
         </Card>
 
-        <Dialog open={isAddTicketDialogOpen} onOpenChange={setIsAddTicketDialogOpen}>
+        <Dialog
+          open={isAddTicketDialogOpen}
+          onOpenChange={setIsAddTicketDialogOpen}
+        >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Add Ticket to Project</DialogTitle>
@@ -566,10 +630,7 @@ export default function Tickets() {
               >
                 Cancel
               </Button>
-              <Button
-                onClick={handleAddTicket}
-                disabled={isAddingTicket}
-              >
+              <Button onClick={handleAddTicket} disabled={isAddingTicket}>
                 {isAddingTicket ? "Adding..." : "Add Ticket"}
               </Button>
             </DialogFooter>

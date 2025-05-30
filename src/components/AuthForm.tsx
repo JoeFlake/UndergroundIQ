@@ -24,8 +24,6 @@ const AuthForm = ({ type }: AuthFormProps) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("user");
-  const [bsUser, setBsUser] = useState("");
-  const [bsPass, setBsPass] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,15 +48,13 @@ const AuthForm = ({ type }: AuthFormProps) => {
         return;
       }
 
-      // 2. Insert into users table with role and credentials
+      // 2. Insert into users table with role (no Blue Stakes credentials)
       if (data.user) {
         await supabase.from("users").insert([
           {
             id: data.user.id,
             email,
             role, // This will be "admin" if selected
-            bluestakes_username: bsUser || null,
-            bluestakes_password: bsPass || null,
           },
         ]);
       }
@@ -99,8 +95,6 @@ const AuthForm = ({ type }: AuthFormProps) => {
             id: userId,
             email,
             role, // Default to 'user' or use selected role
-            bluestakes_username: role === "admin" ? bsUser : null,
-            bluestakes_password: role === "admin" ? bsPass : null,
           },
         ]);
         if (dbError) {
@@ -205,32 +199,6 @@ const AuthForm = ({ type }: AuthFormProps) => {
                     <option value="user">User</option>
                   </select>
                 </div>
-              )}
-              {role === "admin" && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="bsUser">Blue Stakes Username</Label>
-                    <Input
-                      id="bsUser"
-                      type="text"
-                      placeholder="Enter your Blue Stakes username"
-                      value={bsUser}
-                      onChange={(e) => setBsUser(e.target.value)}
-                      required={role === "admin"}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="bsPass">Blue Stakes Password</Label>
-                    <Input
-                      id="bsPass"
-                      type="password"
-                      placeholder="Enter your Blue Stakes password"
-                      value={bsPass}
-                      onChange={(e) => setBsPass(e.target.value)}
-                      required={role === "admin"}
-                    />
-                  </div>
-                </>
               )}
             </>
           )}

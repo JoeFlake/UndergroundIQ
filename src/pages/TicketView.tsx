@@ -18,7 +18,11 @@ const TicketView = () => {
   const [loading, setLoading] = useState(true);
   const [responsesLoading, setResponsesLoading] = useState(true);
   const { user } = useAuth();
-  const { bluestakesToken, isLoading: authLoading, error: authError } = useBluestakesAuth();
+  const {
+    bluestakesToken,
+    isLoading: authLoading,
+    error: authError,
+  } = useBluestakesAuth();
   const [projectName, setProjectName] = useState<string | null>(null);
 
   useEffect(() => {
@@ -51,21 +55,24 @@ const TicketView = () => {
         .then(({ data }) => setProjectName(data?.name || null));
     }
   }, [searchParams]);
-  
+
   useEffect(() => {
     const fetchResponses = async () => {
       if (!ticketId || !bluestakesToken) {
-        console.log('Missing required data:', { ticketId, hasToken: !!bluestakesToken });
+        console.log("Missing required data:", {
+          ticketId,
+          hasToken: !!bluestakesToken,
+        });
         return;
       }
       try {
         setResponsesLoading(true);
-        console.log('Fetching responses for ticket:', ticketId);
+        console.log("Fetching responses for ticket:", ticketId);
         const responsesData = await bluestakesService.getResponsesByTicket(
           ticketId,
           bluestakesToken
         );
-        console.log('Received responses data:', responsesData);
+        console.log("Received responses data:", responsesData);
         setResponses(responsesData);
       } catch (error) {
         console.error("Error fetching responses data:", error);
@@ -106,10 +113,10 @@ const TicketView = () => {
           </CardHeader>
           <CardContent className="text-center">
             <div className="flex flex-col items-center justify-center h-full">
-              <h2 className="text-2xl font-semibold mb-2">Authentication Error</h2>
-              <p className="text-muted-foreground">
-                {authError}
-              </p>
+              <h2 className="text-2xl font-semibold mb-2">
+                Authentication Error
+              </h2>
+              <p className="text-muted-foreground">{authError}</p>
             </div>
             <Button onClick={handleBack}>
               <ArrowLeft className="mr-2 h-4 w-4" />
@@ -164,19 +171,19 @@ const TicketView = () => {
   const status = isActive
     ? "Active"
     : currentTicket.expires
-    ? "Expired"
-    : currentTicket.status ||
-      currentTicket.type ||
-      currentTicket.revision ||
-      "No status";
+      ? "Expired"
+      : currentTicket.status ||
+        currentTicket.type ||
+        currentTicket.revision ||
+        "No status";
   // Dates
   const formatDate = (dateString) => {
     if (!dateString) return "-";
-    const options: Intl.DateTimeFormatOptions = { 
+    const options: Intl.DateTimeFormatOptions = {
       weekday: "long" as const,
-      year: "numeric" as const, 
-      month: "short" as const, 
-      day: "numeric" as const 
+      year: "numeric" as const,
+      month: "short" as const,
+      day: "numeric" as const,
     };
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
@@ -212,7 +219,7 @@ const TicketView = () => {
   const googleMapsUrl = hasCoords
     ? `https://www.google.com/maps?q=${lat},${lng}&z=17&output=embed&style=feature:poi|visibility:off&markers=color:red%7C${lat},${lng}`
     : null;
-    
+
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-6xl mx-auto">
@@ -247,7 +254,9 @@ const TicketView = () => {
               {/* Left: General Info & Dates */}
               <div className="space-y-8">
                 <section>
-                  <h3 className="text-3xl font-medium mb-2 text-gray-600">General Info</h3>
+                  <h3 className="text-3xl font-medium mb-2 text-gray-600">
+                    General Info
+                  </h3>
                 </section>
                 <section>
                   <h3 className="text-xl font-medium mb-2">Dates</h3>
@@ -293,7 +302,9 @@ const TicketView = () => {
               </div>
               {/* Right: Map & Location */}
               <div>
-                <h3 className="text-3xl font-medium mb-2 text-gray-600">Map & Location</h3>
+                <h3 className="text-3xl font-medium mb-2 text-gray-600">
+                  Map & Location
+                </h3>
                 {hasCoords ? (
                   <iframe
                     src={googleMapsUrl}
@@ -339,56 +350,69 @@ const TicketView = () => {
                 </div>
               </div>
             </div>
-          <div className="mt-8">
-            <h3 className="text-3xl font-medium mb-4 text-gray-600">Ticket Responses</h3>
-            {(() => {
-              console.log('Rendering responses table with data:', responses);
-              return responsesLoading ? (
-                <div className="animate-pulse flex flex-col items-center p-4">
-                  <div className="h-4 w-24 bg-blue-200 rounded mb-2"></div>
-                  <div className="h-4 w-48 bg-blue-200 rounded"></div>
-                </div>
-              ) : responses.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Utility Name</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[300px]">Response</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[300px]">Description</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {responses.map((response, index) => {
-                        console.log(`Rendering response row ${index}:`, response);
-                        return (
-                          <tr key={index} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {response.response || ''}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              {response.mbname || ''}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-500 max-w-[300px] break-words">
-                              {response.description || 'PENDING' || ''}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-500 max-w-[300px] break-words">
-                              {response.mbdescription ||''}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="text-center text-gray-500 py-4">
-                  No responses available for this ticket.
-                </div>
-              );
-            })()}
-          </div>
+            <div className="mt-8">
+              <h3 className="text-3xl font-medium mb-4 text-gray-600">
+                Ticket Responses
+              </h3>
+              {(() => {
+                console.log("Rendering responses table with data:", responses);
+                return responsesLoading ? (
+                  <div className="animate-pulse flex flex-col items-center p-4">
+                    <div className="h-4 w-24 bg-blue-200 rounded mb-2"></div>
+                    <div className="h-4 w-48 bg-blue-200 rounded"></div>
+                  </div>
+                ) : responses.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Code
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Utility Name
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[300px]">
+                            Response
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[300px]">
+                            Description
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {responses.map((response, index) => {
+                          console.log(
+                            `Rendering response row ${index}:`,
+                            response
+                          );
+                          return (
+                            <tr key={index} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {response.response || ""}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {response.mbname || ""}
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-500 max-w-[300px] break-words">
+                                {response.description || "PENDING" || ""}
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-500 max-w-[300px] break-words">
+                                {response.mbdescription || ""}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center text-gray-500 py-4">
+                    No responses available for this ticket.
+                  </div>
+                );
+              })()}
+            </div>
           </CardContent>
         </Card>
       </div>
