@@ -2,12 +2,24 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { bluestakesService } from "@/lib/bluestakesService";
+import { bluestakesService, type TicketSecondaryFunction } from "@/lib/bluestakesService";
 import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBluestakesAuth } from "@/hooks/useBluestakesAuth";
 import { supabase } from "@/lib/supabaseClient";
 import { Map } from "../components/Map";
+import { useToast } from "@/components/ui/use-toast";
+
+interface SecondaryFunctions {
+  ticket: string;
+  revision: string;
+  cancel: boolean;
+  comment: boolean;
+  remark: boolean;
+  retransmit: boolean;
+  secondNotice: boolean;
+  update: boolean;
+}
 
 const TicketView = () => {
   const { ticketId } = useParams();
@@ -25,6 +37,9 @@ const TicketView = () => {
     error: authError,
   } = useBluestakesAuth();
   const [projectName, setProjectName] = useState<string | null>(null);
+  const [secondaryFunctions, setSecondaryFunctions] = useState<TicketSecondaryFunction | null>(null);
+  const [loadingSecondaryFunctions, setLoadingSecondaryFunctions] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchTicketData = async () => {
@@ -78,11 +93,46 @@ const TicketView = () => {
     fetchResponses();
   }, [ticketId, bluestakesToken]);
 
+  useEffect(() => {
+    const fetchSecondaryFunctions = async () => {
+      if (!ticketId || !bluestakesToken) return;
+      try {
+        setLoadingSecondaryFunctions(true);
+        const response = await bluestakesService.getTicketSecondaryFunction(ticketId, bluestakesToken);
+        setSecondaryFunctions(response);
+      } catch (error) {
+        console.error("Error fetching secondary functions:", error);
+      } finally {
+        setLoadingSecondaryFunctions(false);
+      }
+    };
+    fetchSecondaryFunctions();
+  }, [ticketId, bluestakesToken]);
+
   const handleBack = () => {
     if (projectId) {
       navigate(`/tickets?project=${encodeURIComponent(projectId)}`);
     } else {
       navigate("/");
+    }
+  };
+
+  const handleSecondaryFunction = async (action: string) => {
+    if (!ticketId || !bluestakesToken) return;
+    try {
+      // TODO: Implement the actual API calls for each action
+      toast({
+        title: "Not Implemented",
+        description: `The ${action} action is not yet implemented.`,
+        variant: "destructive",
+      });
+    } catch (error) {
+      console.error(`Error performing ${action}:`, error);
+      toast({
+        title: "Error",
+        description: `Failed to perform ${action}. Please try again.`,
+        variant: "destructive",
+      });
     }
   };
 
@@ -215,10 +265,52 @@ const TicketView = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-6xl mx-auto">
-        <Button variant="ghost" onClick={handleBack} className="mb-4">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to {projectName ? `${projectName}` : "Dashboard"}
-        </Button>
+        <div className="flex justify-between items-center mb-4">
+          <Button variant="ghost" onClick={handleBack}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to {projectName ? `${projectName}` : "Dashboard"}
+          </Button>
+          {!loadingSecondaryFunctions && secondaryFunctions && (
+            <div className="flex gap-2">
+              {secondaryFunctions.cancel && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => handleSecondaryFunction("cancel")}
+                >
+                  Cancel
+                </Button>
+              )}
+              {secondaryFunctions.remark && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => handleSecondaryFunction("remark")}
+                >
+                  Remark
+                </Button>
+              )}
+              {secondaryFunctions.secondNotice && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => handleSecondaryFunction("second notice")}
+                >
+                  Second Notice
+                </Button>
+              )}
+              {secondaryFunctions.update && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => handleSecondaryFunction("update")}
+                >
+                  Update
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
 
         <Card className="mb-8 animate-fade-in">
           <CardHeader>

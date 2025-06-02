@@ -155,9 +155,15 @@ export interface BlueStakesTicket {
   centroid: GeoJSONFeature;
 }
 
-interface TicketSecondaryFunction {
+export interface TicketSecondaryFunction {
+  ticket: string;
+  revision: string;
+  cancel: boolean;
+  comment: boolean;
+  remark: boolean;
+  retransmit: boolean;
+  secondNotice: boolean;
   update: boolean;
-  // Add other fields if they exist in the response
 }
 
 const BASE_URL = "https://newtiny-api.bluestakes.org/api";
