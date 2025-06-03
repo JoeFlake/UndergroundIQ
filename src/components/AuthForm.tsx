@@ -184,23 +184,20 @@ const AuthForm = ({ type }: AuthFormProps) => {
             </div>
           </div>
 
-          {(type === "signup" || role === "admin") && (
-            <>
-              {type === "signup" && (
-                <div className="space-y-2">
-                  <Label htmlFor="role">Role</Label>
-                  <select
-                    id="role"
-                    value={role}
-                    onChange={(e) => setRole(e.target.value)}
-                    className="w-full border rounded px-2 py-2"
-                  >
-                    <option value="admin">Admin</option>
-                    <option value="user">User</option>
-                  </select>
-                </div>
-              )}
-            </>
+          {/* Remove sign up UI from login page */}
+          {type === "signup" && (
+            <div className="space-y-2">
+              <Label htmlFor="role">Role</Label>
+              <select
+                id="role"
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                className="w-full border rounded px-2 py-2"
+              >
+                <option value="admin">Admin</option>
+                <option value="user">User</option>
+              </select>
+            </div>
           )}
         </CardContent>
 
@@ -222,29 +219,8 @@ const AuthForm = ({ type }: AuthFormProps) => {
             )}
           </Button>
 
-          <div className="mt-4 text-center text-sm">
-            {type === "login" ? (
-              <p>
-                Don't have an account?{" "}
-                <Link
-                  to="/signup"
-                  className="text-gray-900 hover:text-gray-500 underline transition-colors"
-                >
-                  Sign up
-                </Link>
-              </p>
-            ) : (
-              <p>
-                Already have an account?{" "}
-                <Link
-                  to="/login"
-                  className="text-gray-900 hover:text-gray-500 underline transition-colors"
-                >
-                  Sign in
-                </Link>
-              </p>
-            )}
-          </div>
+          {/* Remove sign up link from login page */}
+          {type === "login" && null}
         </CardFooter>
       </form>
     </Card>

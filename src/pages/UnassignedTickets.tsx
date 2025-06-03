@@ -227,7 +227,35 @@ export default function UnassignedTickets() {
             !updatedAssignedTicketNumbers.has(ticket.ticket)
         );
 
-        setTickets(filteredTickets);
+        // After all assignment logic, fetch assigned tickets again
+        const { data: finalAssigned, error: finalAssignedError } =
+          await supabase.from("project_tickets").select("ticket_number");
+        if (finalAssignedError) throw finalAssignedError;
+        // Normalize ticket numbers to uppercase strings for comparison
+        const finalAssignedSet = new Set(
+          (finalAssigned || []).map((row) =>
+            String(row.ticket_number).toUpperCase()
+          )
+        );
+
+        // Show all tickets that are NOT assigned and are active
+        const trulyUnassigned = allTickets.filter(
+          (ticket) =>
+            !finalAssignedSet.has(String(ticket.ticket).toUpperCase()) &&
+            ticket.expires &&
+            new Date(ticket.expires) > new Date()
+        );
+        // Debug logs
+        console.log(
+          "All Tickets:",
+          allTickets.map((t) => t.ticket)
+        );
+        console.log("Assigned Tickets:", Array.from(finalAssignedSet));
+        console.log(
+          "Truly Unassigned:",
+          trulyUnassigned.map((t) => t.ticket)
+        );
+        setTickets(trulyUnassigned);
 
         // Fetch projects for this user
         const {
@@ -243,25 +271,8 @@ export default function UnassignedTickets() {
               }[]
             | null;
           error: unknown;
-        } = await supabase
-          .from("user_projects")
-          .select("project_id, projects(id, name)")
-          .eq("user_id", user.id);
-        if (userProjectsError) throw userProjectsError;
-        setProjects(
-          (userProjects || [])
-            .map((up) => {
-              if (Array.isArray(up.projects)) {
-                return up.projects[0];
-              }
-              return up.projects;
-            })
-            .filter((proj) => proj && proj.id && proj.name)
-            .map((proj) => ({
-              project_id: proj.id,
-              project_name: proj.name,
-            }))
-        );
+        } = { data: [], error: null }; // No longer fetch user_projects
+        setProjects([]); // Projects are now company-based, handled elsewhere if needed
       } catch (err: unknown) {
         setError(
           isErrorWithMessage(err) ? err.message : "Failed to fetch tickets"

@@ -77,17 +77,20 @@ export function Navbar() {
                 <HomeIcon className="h-4 w-4 mr-2" />
                 Home
               </button>
-              <button
-                onClick={() => navigate("/unassigned-tickets")}
-                className={`border-b-2 px-1 pt-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-gray-200 focus:ring-opacity-75 rounded-sm inline-flex items-center ${
-                  isActive("/unassigned-tickets")
-                    ? "border-orange-500 text-orange-600"
-                    : "border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-900"
-                }`}
-              >
-                <CheckSquare className="h-4 w-4 mr-2" />
-                To Do
-              </button>
+              {/* To Do tab only for admins */}
+              {isAdmin && (
+                <button
+                  onClick={() => navigate("/unassigned-tickets")}
+                  className={`border-b-2 px-1 pt-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-gray-200 focus:ring-opacity-75 rounded-sm inline-flex items-center ${
+                    isActive("/unassigned-tickets")
+                      ? "border-orange-500 text-orange-600"
+                      : "border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-900"
+                  }`}
+                >
+                  <CheckSquare className="h-4 w-4 mr-2" />
+                  To Do
+                </button>
+              )}
               {isAdmin && (
                 <button
                   onClick={() => navigate("/admin")}
