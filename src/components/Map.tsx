@@ -21,6 +21,8 @@ interface MapProps {
   width?: string;
   zoom?: number;
   workAreaGeoJSON?: any; // GeoJSON Feature or FeatureCollection
+  showTooltips?: boolean;
+  onPolygonClick?: (ticketNumber: string) => void;
 }
 
 // Helper: Haversine distance in meters between two lat/lng
@@ -62,6 +64,8 @@ export function Map({
   width = "100%",
   zoom = 17,
   workAreaGeoJSON,
+  showTooltips = true,
+  onPolygonClick,
 }: MapProps) {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -92,6 +96,35 @@ export function Map({
             weight: 2,
             lineJoin: "round",
           },
+          onEachFeature: (feature, layer) => {
+            if (feature.properties) {
+              const ticketNumber = feature.properties.ticketNumber;
+              
+              // Add tooltip if enabled
+              if (showTooltips) {
+                layer.bindTooltip(
+                  `<div class="text-sm font-medium">Ticket: ${ticketNumber}</div>`,
+                  {
+                    sticky: false,
+                    permanent: false,
+                    direction: 'top',
+                    offset: [0, -10],
+                    opacity: 0.9,
+                    className: 'custom-tooltip'
+                  }
+                );
+              }
+
+              // Add click handler if provided
+              if (onPolygonClick) {
+                layer.on('click', () => {
+                  onPolygonClick(ticketNumber);
+                });
+                // Add cursor style to indicate clickable
+                layer.setStyle({ cursor: 'pointer' });
+              }
+            }
+          }
         }).addTo(mapRef.current);
         mapRef.current.fitBounds(shapeRef.current.getBounds());
       } else {
@@ -112,6 +145,35 @@ export function Map({
             weight: 2,
             lineJoin: "round",
           },
+          onEachFeature: (feature, layer) => {
+            if (feature.properties) {
+              const ticketNumber = feature.properties.ticketNumber;
+              
+              // Add tooltip if enabled
+              if (showTooltips) {
+                layer.bindTooltip(
+                  `<div class="text-sm font-medium">Ticket: ${ticketNumber}</div>`,
+                  {
+                    sticky: false,
+                    permanent: false,
+                    direction: 'top',
+                    offset: [0, -10],
+                    opacity: 0.9,
+                    className: 'custom-tooltip'
+                  }
+                );
+              }
+
+              // Add click handler if provided
+              if (onPolygonClick) {
+                layer.on('click', () => {
+                  onPolygonClick(ticketNumber);
+                });
+                // Add cursor style to indicate clickable
+                layer.setStyle({ cursor: 'pointer' });
+              }
+            }
+          }
         }).addTo(mapRef.current);
         mapRef.current.fitBounds(shapeRef.current.getBounds());
       } else {
@@ -125,7 +187,7 @@ export function Map({
         shapeRef.current = null;
       }
     };
-  }, [lat, lng, zoom, workAreaGeoJSON]);
+  }, [lat, lng, zoom, workAreaGeoJSON, showTooltips, onPolygonClick]);
 
   return (
     <div
@@ -138,7 +200,26 @@ export function Map({
         boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
       }}
     >
-      <style>{`.leaflet-control-attribution { display: none !important; }`}</style>
+      <style>
+        {`
+          .leaflet-control-attribution { display: none !important; }
+          .custom-tooltip {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.375rem;
+            padding: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            pointer-events: none;
+          }
+          .custom-tooltip:before {
+            border-top-color: #e5e7eb !important;
+            border-right-color: transparent !important;
+            left: 50% !important;
+            top: 100% !important;
+            transform: translateX(-50%) !important;
+          }
+        `}
+      </style>
     </div>
   );
 }

@@ -394,6 +394,7 @@ const TicketView = () => {
                     lat={lat} 
                     lng={lng} 
                     workAreaGeoJSON={currentTicket.work_area}
+                    showTooltips={false}
                   />
                 ) : currentTicket.map_url ? (
                   <iframe

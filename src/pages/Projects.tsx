@@ -45,8 +45,6 @@ export default function Projects() {
       .eq("id", user.id)
       .single();
 
-    console.log("User data:", userData);
-
     // Then try to get company data
     const { data: companyData, error: companyError } = await supabase
       .from("companies")
@@ -54,16 +52,8 @@ export default function Projects() {
       .eq("id", userData?.company_id)
       .single();
 
-    console.log("Company data:", companyData);
-    console.log("Company error:", companyError);
-
     if (!companyError && companyData) {
       setCompanyName(companyData.name);
-    } else {
-      console.log(
-        "Failed to get company name. User data:",
-        JSON.stringify(userData, null, 2)
-      );
     }
   }
 

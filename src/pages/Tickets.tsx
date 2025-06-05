@@ -53,6 +53,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { Label } from "@/components/ui/label";
+import { Map } from "../components/Map";
 
 // Remove the Ticket type import and use BlueStakesTicket instead
 type Ticket = BlueStakesTicket;
@@ -119,6 +120,15 @@ export default function Tickets() {
   const [newTicketNumber, setNewTicketNumber] = useState("");
   const [isAddingTicket, setIsAddingTicket] = useState(false);
   const [isEnrichingTickets, setIsEnrichingTickets] = useState(false);
+  const [projectCenter, setProjectCenter] = useState<{lat: number, lng: number} | null>(null);
+  const [projectWorkArea, setProjectWorkArea] = useState<any>(null);
+
+  // Add dummy assignees data
+  const projectAssignees = [
+    { id: 1, name: "John Smith", role: "Project Manager", email: "john.smith@example.com" },
+    { id: 2, name: "Sarah Johnson", role: "Field Supervisor", email: "sarah.j@example.com" },
+    { id: 3, name: "Mike Wilson", role: "Crew Lead", email: "mike.w@example.com" },
+  ];
 
   useEffect(() => {
     async function fetchTickets() {
@@ -420,6 +430,67 @@ export default function Tickets() {
     return getStatus(ticket.bluestakes_data) === "Active";
   });
 
+  // Add function to calculate project center and work area from tickets
+  const calculateProjectLocation = (tickets: ProjectTicket[]) => {
+    const activeTickets = tickets.filter(ticket => 
+      ticket.bluestakes_data && getStatus(ticket.bluestakes_data) === "Active"
+    );
+
+    if (activeTickets.length === 0) return;
+
+    // Calculate center point from all active tickets
+    let totalLat = 0;
+    let totalLng = 0;
+    let validTickets = 0;
+
+    // Collect all valid work areas
+    const workAreas = activeTickets
+      .filter(ticket => {
+        const lat = ticket.bluestakes_data?.latitude;
+        const lng = ticket.bluestakes_data?.longitude;
+        if (!lat || !lng) return false;
+        const latNum = Number(lat);
+        const lngNum = Number(lng);
+        if (!isNaN(latNum) && !isNaN(lngNum)) {
+          totalLat += latNum;
+          totalLng += lngNum;
+          validTickets++;
+          return true;
+        }
+        return false;
+      })
+      .map(ticket => ({
+        ...ticket.bluestakes_data!.work_area,
+        properties: {
+          ...ticket.bluestakes_data!.work_area.properties,
+          ticketNumber: ticket.ticket_number,
+          status: getStatus(ticket.bluestakes_data)
+        }
+      }));
+
+    if (validTickets > 0) {
+      setProjectCenter({
+        lat: totalLat / validTickets,
+        lng: totalLng / validTickets
+      });
+    }
+
+    // Create a FeatureCollection of all work areas
+    if (workAreas.length > 0) {
+      setProjectWorkArea({
+        type: "FeatureCollection",
+        features: workAreas
+      });
+    }
+  };
+
+  // Update location when tickets change
+  useEffect(() => {
+    if (tickets.length > 0) {
+      calculateProjectLocation(tickets);
+    }
+  }, [tickets]);
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -527,6 +598,56 @@ export default function Tickets() {
             </DropdownMenu>
           </CardHeader>
           <CardContent>
+            {/* Add project details section */}
+            {projectCenter && (
+              <div className="mb-16">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-6">
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">Project Details</h4>
+                      <div className="space-y-2">
+                        <div className="text-sm text-muted-foreground">
+                          Active Tickets: {activeTickets.length}
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">Project Assignees</h4>
+                      <div className="space-y-3">
+                        {projectAssignees.map((assignee) => (
+                          <div key={assignee.id} className="flex items-start space-x-3">
+                            <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600">
+                              {assignee.name.split(' ').map(n => n[0]).join('')}
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium">{assignee.name}</div>
+                              <div className="text-xs text-muted-foreground">{assignee.role}</div>
+                              <div className="text-xs text-muted-foreground">{assignee.email}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="h-[300px]">
+                    <Map
+                      lat={projectCenter.lat}
+                      lng={projectCenter.lng}
+                      zoom={13}
+                      workAreaGeoJSON={projectWorkArea}
+                      onPolygonClick={(ticketNumber) => {
+                        const params = searchParams.toString();
+                        const url = params
+                          ? `/tickets/${ticketNumber}?${params}`
+                          : `/tickets/${ticketNumber}`;
+                        navigate(url);
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+            {/* Existing tickets table */}
             {loading ? (
               <Skeleton className="h-20 w-full" />
             ) : error ? (
