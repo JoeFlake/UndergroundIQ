@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { Navbar } from "../components/Navbar";
 import { useBluestakesAuth } from "../hooks/useBluestakesAuth";
@@ -141,6 +141,23 @@ function getTicketLatLng(ticket: any): { lat: number | null, lng: number | null 
   return { lat, lng };
 }
 
+// Add custom hook for managing window references
+function useWindowReference(windowName: string) {
+  const windowRef = useRef<Window | null>(null);
+
+  const openWindow = (url: string) => {
+    // Only open if window doesn't exist or is closed
+    if (!windowRef.current || windowRef.current.closed) {
+      windowRef.current = window.open(url, windowName);
+    } else {
+      // If window exists, just focus it
+      windowRef.current.focus();
+    }
+  };
+
+  return openWindow;
+}
+
 export default function UnassignedTickets() {
   const { toast } = useToast();
   const { user, setUser } = useAuth();
@@ -169,6 +186,8 @@ export default function UnassignedTickets() {
   const [openPopoverTicket, setOpenPopoverTicket] = useState<string | null>(null);
   const [popoverTicketData, setPopoverTicketData] = useState<Record<string, any>>({});
   const [popoverLoading, setPopoverLoading] = useState(false);
+
+  const openBluestakesWindow = useWindowReference('bluestakes_ticket_entry');
 
   // Add function to get project name for a ticket
   const getProjectForTicket = async (ticketNumber: string) => {
@@ -439,6 +458,8 @@ export default function UnassignedTickets() {
 
   const handleUpdateTicket = async (ticket: Ticket) => {
     try {
+      const ticketUrl = `https://newtin.bluestakes.org/newtinweb/UTAH_ticketentry.html`;
+      
       // Copy ticket number to clipboard
       await navigator.clipboard.writeText(ticket.ticket);
 
@@ -448,9 +469,7 @@ export default function UnassignedTickets() {
         description: `Ticket number ${ticket.ticket} has been copied to clipboard`,
       });
 
-      // Navigate to external URL
-      const ticketUrl = `https://newtin.bluestakes.org/newtinweb/UTAH_ticketentry.html`;
-      window.open(ticketUrl, "_blank");
+      openBluestakesWindow(ticketUrl);
     } catch (error) {
       toast({
         title: "Error",
