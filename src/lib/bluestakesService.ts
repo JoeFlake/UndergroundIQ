@@ -181,24 +181,42 @@ function getLatestRevisions(tickets: BlueStakesTicket[]): BlueStakesTicket[] {
 
 export const bluestakesService = {
   async getAllTickets(token: string): Promise<BlueStakesTicket[]> {
+    const tickets: BlueStakesTicket[] = [];
+    const limit = 100;
+    let offset = 0;
+    const now = new Date();
+    const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
+    const start = fourWeeksAgo.toISOString().split('T')[0]; // YYYY-MM-DD
+    const end = now.toISOString().split('T')[0]; // Today's date in YYYY-MM-DD
+    let hasMore = true;
+
     try {
-      const response = await fetch(
-        `${BASE_URL}/tickets/summary`,
-        {
+      while (hasMore) {
+        // URL format: .../tickets/search?limit=100&start=YYYY-MM-DD&end=YYYY-MM-DD
+        const url = new URL(`${BASE_URL}/tickets/search`);
+        url.searchParams.append('limit', limit.toString());
+        url.searchParams.append('start', start);
+        url.searchParams.append('end', end);
+        if (offset > 0) url.searchParams.append('offset', offset.toString());
+
+        const response = await fetch(url.toString(), {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
             Accept: "application/json",
           },
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch tickets from Blue Stakes");
         }
-      );
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch tickets from Blue Stakes");
+        const responseData = await response.json();
+        const pageTickets = Array.isArray(responseData) ? responseData : responseData.data || [];
+        tickets.push(...pageTickets);
+        if (pageTickets.length < limit) hasMore = false;
+        else offset += limit;
       }
-
-      const responseData = await response.json();
-      const tickets = Array.isArray(responseData) ? responseData : responseData.data || [];
       return getLatestRevisions(tickets);
     } catch (error) {
       console.error("Error fetching all tickets:", error);
