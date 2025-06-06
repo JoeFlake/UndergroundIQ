@@ -33,6 +33,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "../components/ui/dialog";
+import { subDays, formatISO } from "date-fns";
 
 // Remove the local Ticket interface and use BlueStakesTicket instead
 type Ticket = BlueStakesTicket;
@@ -133,7 +134,7 @@ export default function UnassignedTickets() {
 
   // First effect to fetch unassigned tickets
   useEffect(() => {
-    const fetchUnassignedTickets = async () => {
+    const fetchAllUnassignedTickets = async () => {
       if (!bluestakesToken) {
         setLoading(false);
         return;
@@ -142,138 +143,63 @@ export default function UnassignedTickets() {
       setLoading(true);
       setError("");
       try {
-        // Fetch all tickets
-        const allTickets =
-          await bluestakesService.getAllTickets(bluestakesToken);
+        const allTickets = [];
+        const limit = 100;
+        let offset = 0;
+        let hasMore = true;
 
-        // Fetch all assigned ticket numbers from project_tickets
-        const {
-          data: assigned,
-          error: assignedError,
-        }: { data: { ticket_number: string }[] | null; error: unknown } =
-          await supabase.from("project_tickets").select("ticket_number");
+        // Calculate date range for last 28 days
+        const endDate = new Date();
+        const startDate = subDays(endDate, 28);
+
+        while (hasMore) {
+          const params = new URLSearchParams({
+            offset: offset.toString(),
+            limit: limit.toString(),
+            start: formatISO(startDate, { representation: "date" }),
+            end: formatISO(endDate, { representation: "date" }),
+          });
+
+          // You may need to add authentication headers here
+          const response = await fetch(
+            `https://newtin-api.bluestakes.org/api/tickets/search?${params.toString()}`,
+            {
+              headers: {
+                Authorization: `Bearer ${bluestakesToken}`,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+          if (!response.ok) throw new Error("Failed to fetch tickets");
+          const result = await response.json();
+
+          // result.data is the array of tickets
+          allTickets.push(...(result.data || []));
+
+          // If less than limit returned, we're done
+          if (!result.data || result.data.length < limit) {
+            hasMore = false;
+          } else {
+            offset += limit;
+          }
+        }
+
+        // Now filter out assigned tickets as before
+        const { data: assigned, error: assignedError } = await supabase
+          .from("project_tickets")
+          .select("ticket_number");
         if (assignedError) throw assignedError;
         const assignedTicketNumbers = new Set(
-          (assigned || []).map((row) => row.ticket_number)
+          (assigned || []).map((row) => String(row.ticket_number).toUpperCase())
         );
 
-        // Filter out assigned tickets and only keep active ones
-        const now = new Date();
-        const unassignedTickets = allTickets.filter(
-          (ticket) =>
-            !assignedTicketNumbers.has(ticket.ticket) &&
-            ticket.expires &&
-            new Date(ticket.expires) > now
-        );
-
-        // For each unassigned ticket, check if it's an update of an existing ticket
-        const updatePromises = unassignedTickets.map(async (ticket) => {
-          try {
-            // Get detailed ticket info including original ticket
-            const ticketDetails = await bluestakesService.getTicketByNumber(
-              ticket.ticket,
-              bluestakesToken
-            );
-
-            if (ticketDetails.original_ticket) {
-              // Check if the original ticket is assigned to any projects
-              const { data: originalAssignments, error: originalError } =
-                await supabase
-                  .from("project_tickets")
-                  .select("project_id")
-                  .eq("ticket_number", ticketDetails.original_ticket);
-
-              if (originalError) throw originalError;
-
-              if (originalAssignments && originalAssignments.length > 0) {
-                // Create new assignments for each project the original ticket was assigned to
-                const assignmentPromises = originalAssignments.map(
-                  (assignment) =>
-                    supabase.from("project_tickets").insert({
-                      project_id: assignment.project_id,
-                      ticket_number: ticket.ticket,
-                      replace_by_date: ticketDetails.replace_by_date,
-                    })
-                );
-
-                await Promise.all(assignmentPromises);
-                return true; // Ticket was assigned
-              }
-            }
-            return false; // No original ticket or no assignments found
-          } catch (error) {
-            console.error(`Error processing ticket ${ticket.ticket}:`, error);
-            return false;
-          }
-        });
-
-        // Wait for all ticket checks to complete
-        const assignmentResults = await Promise.all(updatePromises);
-
-        // Fetch updated assigned tickets after potential updates
-        const { data: updatedAssigned, error: updatedAssignedError } =
-          await supabase.from("project_tickets").select("ticket_number");
-
-        if (updatedAssignedError) throw updatedAssignedError;
-
-        const updatedAssignedTicketNumbers = new Set(
-          (updatedAssigned || []).map((row) => row.ticket_number)
-        );
-
-        // Filter out newly assigned tickets
-        const filteredTickets = unassignedTickets.filter(
-          (ticket, index) =>
-            !assignmentResults[index] &&
-            !updatedAssignedTicketNumbers.has(ticket.ticket)
-        );
-
-        // After all assignment logic, fetch assigned tickets again
-        const { data: finalAssigned, error: finalAssignedError } =
-          await supabase.from("project_tickets").select("ticket_number");
-        if (finalAssignedError) throw finalAssignedError;
-        // Normalize ticket numbers to uppercase strings for comparison
-        const finalAssignedSet = new Set(
-          (finalAssigned || []).map((row) =>
-            String(row.ticket_number).toUpperCase()
-          )
-        );
-
-        // Show all tickets that are NOT assigned and are active
         const trulyUnassigned = allTickets.filter(
           (ticket) =>
-            !finalAssignedSet.has(String(ticket.ticket).toUpperCase()) &&
-            ticket.expires &&
-            new Date(ticket.expires) > new Date()
+            !assignedTicketNumbers.has(String(ticket.ticket).toUpperCase())
         );
-        // Debug logs
-        console.log(
-          "All Tickets:",
-          allTickets.map((t) => t.ticket)
-        );
-        console.log("Assigned Tickets:", Array.from(finalAssignedSet));
-        console.log(
-          "Truly Unassigned:",
-          trulyUnassigned.map((t) => t.ticket)
-        );
-        setTickets(trulyUnassigned);
 
-        // Fetch projects for this user
-        const {
-          data: userProjects,
-          error: userProjectsError,
-        }: {
-          data:
-            | {
-                projects:
-                  | { id: number; name: string }
-                  | { id: number; name: string }[]
-                  | null;
-              }[]
-            | null;
-          error: unknown;
-        } = { data: [], error: null }; // No longer fetch user_projects
-        setProjects([]); // Projects are now company-based, handled elsewhere if needed
-      } catch (err: unknown) {
+        setTickets(trulyUnassigned);
+      } catch (err) {
         setError(
           isErrorWithMessage(err) ? err.message : "Failed to fetch tickets"
         );
@@ -282,7 +208,7 @@ export default function UnassignedTickets() {
       }
     };
 
-    if (user && bluestakesToken) fetchUnassignedTickets();
+    if (user && bluestakesToken) fetchAllUnassignedTickets();
   }, [user, bluestakesToken]);
 
   // Second effect to fetch tickets needing updates

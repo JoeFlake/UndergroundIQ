@@ -34,6 +34,7 @@ export default function Projects() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
   const [companyName, setCompanyName] = useState("");
+  const [userRole, setUserRole] = useState<string>("");
 
   async function fetchUserCompany() {
     if (!user) return;
@@ -44,6 +45,8 @@ export default function Projects() {
       .select("*")
       .eq("id", user.id)
       .single();
+
+    if (userData?.role) setUserRole(userData.role);
 
     // Then try to get company data
     const { data: companyData, error: companyError } = await supabase
@@ -176,15 +179,17 @@ export default function Projects() {
               {companyName}
             </h1>
           </div>
-          <Button
-            onClick={() => setShowCreateModal(true)}
-            className="ml-4 flex items-center gap-2"
-          >
-            <Plus className="h-4 w-4" /> New Project
-          </Button>
+          {userRole === "admin" && (
+            <Button
+              onClick={() => setShowCreateModal(true)}
+              className="ml-4 flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" /> New Project
+            </Button>
+          )}
         </div>
         {/* Create Project Modal */}
-        {showCreateModal && (
+        {userRole === "admin" && showCreateModal && (
           <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30 z-50">
             <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md">
               <h2 className="text-xl font-bold mb-4">Create New Project</h2>
