@@ -14,6 +14,8 @@ import {
 } from "../components/ui/table";
 import { Skeleton } from "../components/ui/skeleton";
 import { supabase } from "../lib/supabaseClient";
+import { renderAsync } from '@react-email/render';
+import Welcome from '../emails/Welcome';
 
 interface Employee {
   id: string;
@@ -37,6 +39,9 @@ export default function AdminPanel() {
   const [newUserRole, setNewUserRole] = useState("user");
   const [addingUser, setAddingUser] = useState(false);
   const [addUserError, setAddUserError] = useState<string | null>(null);
+  const [sendingTestEmail, setSendingTestEmail] = useState(false);
+  const [testEmailError, setTestEmailError] = useState<string | null>(null);
+  const [testEmailSuccess, setTestEmailSuccess] = useState<string | null>(null);
 
   // Fetch employees for the company
   const fetchEmployees = async (companyId: number) => {
@@ -128,6 +133,53 @@ export default function AdminPanel() {
     }
   };
 
+  // Add test email handler
+  const handleSendTestEmail = async () => {
+    if (!user?.email) return;
+    setSendingTestEmail(true);
+    setTestEmailError(null);
+    setTestEmailSuccess(null);
+
+    try {
+      // Get the current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session?.access_token) {
+        setTestEmailError("Authentication error. Please try logging in again.");
+        setSendingTestEmail(false);
+        return;
+      }
+
+      // Render the Welcome email template to HTML
+      const html = await renderAsync(
+        <Welcome username={user.email.split('@')[0]} loginLink="https://app.underground-iq.com/#/login" />
+      );
+
+      const { data, error } = await supabase.functions.invoke('send-email', {
+        body: {
+          recipient: user.email,
+          subject: 'Welcome to UndergroundIQ',
+          message: html,
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) {
+        setTestEmailError(error.message || "Failed to send test email.");
+        setSendingTestEmail(false);
+        return;
+      }
+
+      setTestEmailSuccess("Test welcome email sent successfully!");
+      setSendingTestEmail(false);
+    } catch (err) {
+      setTestEmailError("Unexpected error occurred.");
+      setSendingTestEmail(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -158,6 +210,20 @@ export default function AdminPanel() {
             <Button className="mb-4" onClick={() => setShowAddUser(true)}>
               Add User
             </Button>
+            <Button 
+              variant="outline" 
+              className="mb-4 ml-2" 
+              onClick={handleSendTestEmail}
+              disabled={sendingTestEmail}
+            >
+              {sendingTestEmail ? "Sending..." : "Send Test Email"}
+            </Button>
+            {testEmailError && (
+              <p className="text-red-500 mb-4">{testEmailError}</p>
+            )}
+            {testEmailSuccess && (
+              <p className="text-green-500 mb-4">{testEmailSuccess}</p>
+            )}
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
