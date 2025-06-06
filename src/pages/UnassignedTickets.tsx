@@ -33,6 +33,9 @@ import {
   DialogTitle,
   DialogFooter,
 } from "../components/ui/dialog";
+import { Popover, PopoverTrigger, PopoverContent } from "../components/ui/popover";
+import { Map } from "../components/Map";
+import { Loader2 } from "lucide-react";
 
 // Remove the local Ticket interface and use BlueStakesTicket instead
 type Ticket = BlueStakesTicket;
@@ -83,6 +86,61 @@ async function ensureUserCompanyId(user, setUser) {
   return user?.company_id;
 }
 
+// Helper to get and set session storage
+function getSessionCache(key) {
+  try {
+    const record = JSON.parse(sessionStorage.getItem(key));
+    if (!record) return null;
+    if (Date.now() > record.expiry) {
+      sessionStorage.removeItem(key);
+      return null;
+    }
+    return record.value;
+  } catch {
+    return null;
+  }
+}
+
+function setSessionCache(key, value, ttlMs = 5 * 60 * 1000) { // 5 min default
+  const record = { value, expiry: Date.now() + ttlMs };
+  sessionStorage.setItem(key, JSON.stringify(record));
+}
+
+// Helper to parse coordinates robustly (matches TicketView logic)
+function getTicketLatLng(ticket: any): { lat: number | null, lng: number | null } {
+  function parseCoord(val: any): number | null {
+    if (typeof val === "number") return val;
+    if (!val) return null;
+    const trimmed = String(val).trim();
+    if (trimmed === "" || trimmed === " ") return null;
+    const num = Number(trimmed);
+    return isNaN(num) ? null : num;
+  }
+  let lat = parseCoord(ticket.centroid_y);
+  let lng = parseCoord(ticket.centroid_x);
+  if (
+    (lat === null || lng === null) &&
+    ticket.extent_top &&
+    ticket.extent_left &&
+    ticket.extent_bottom &&
+    ticket.extent_right
+  ) {
+    const top = parseCoord(ticket.extent_top);
+    const left = parseCoord(ticket.extent_left);
+    const bottom = parseCoord(ticket.extent_bottom);
+    const right = parseCoord(ticket.extent_right);
+    if ([top, left, bottom, right].every((v) => v !== null)) {
+      lat = (top + bottom) / 2;
+      lng = (left + right) / 2;
+    }
+  }
+  if (lat === null || lng === null) {
+    lat = parseCoord(ticket.latitude);
+    lng = parseCoord(ticket.longitude);
+  }
+  return { lat, lng };
+}
+
 export default function UnassignedTickets() {
   const { toast } = useToast();
   const { user, setUser } = useAuth();
@@ -108,6 +166,10 @@ export default function UnassignedTickets() {
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [creatingProject, setCreatingProject] = useState(false);
+  const [openPopoverTicket, setOpenPopoverTicket] = useState<string | null>(null);
+  const [popoverTicketData, setPopoverTicketData] = useState<Record<string, any>>({});
+  const [popoverLoading, setPopoverLoading] = useState(false);
+
   // Add function to get project name for a ticket
   const getProjectForTicket = async (ticketNumber: string) => {
     try {
@@ -133,167 +195,171 @@ export default function UnassignedTickets() {
     {}
   );
 
-  // First effect to fetch unassigned tickets
-  useEffect(() => {
-    const fetchAll = async () => {
-      if (!bluestakesToken) return;
+  // Fetch all tickets and tickets needing update, with sessionStorage caching
+  async function fetchAll() {
+    if (!bluestakesToken) return;
 
-      setLoading(true);
-      setLoadingUpdates(true);
-      setError("");
+    setLoading(true);
+    setLoadingUpdates(true);
+    setError("");
 
-      try {
-        // Fetch tickets needing update first
-        const updateTickets = await bluestakesService.getTicketsNeedingUpdate(bluestakesToken);
-        setTicketsNeedingUpdate(updateTickets);
+    // Try to load from sessionStorage first
+    const cachedUpdates = getSessionCache("ticketsNeedingUpdate");
+    const cachedUnassigned = getSessionCache("unassignedTickets");
+    if (cachedUpdates && cachedUnassigned) {
+      setTicketsNeedingUpdate(cachedUpdates);
+      setTickets(cachedUnassigned);
+      setLoading(false);
+      setLoadingUpdates(false);
+      return;
+    }
 
-        // Then fetch unassigned tickets (your existing logic)
-        // Ensure user has company_id
-        if (user && !user.company_id && typeof setUser === 'function') {
-          const companyId = await ensureUserCompanyId(user, setUser);
-          if (companyId) user.company_id = companyId;
-        }
+    try {
+      // Fetch tickets needing update first
+      const updateTickets = await bluestakesService.getTicketsNeedingUpdate(bluestakesToken);
+      
+      // Filter out duplicates from updateTickets using a Set
+      const seenUpdateTickets = new Set<string>();
+      const uniqueUpdateTickets = updateTickets.filter(ticket => {
+        if (seenUpdateTickets.has(ticket.ticket)) return false;
+        seenUpdateTickets.add(ticket.ticket);
+        return true;
+      });
 
-        // Fetch all tickets
-        const allTickets =
-          await bluestakesService.getAllTickets(bluestakesToken);
+      // Sort tickets by replace_by_date in ascending order
+      const sortedUpdateTickets = uniqueUpdateTickets.sort((a, b) => {
+        const dateA = a.replace_by_date ? new Date(a.replace_by_date).getTime() : Infinity;
+        const dateB = b.replace_by_date ? new Date(b.replace_by_date).getTime() : Infinity;
+        return dateA - dateB;
+      });
 
-        // Fetch all assigned ticket numbers from project_tickets
-        const {
-          data: assigned,
-          error: assignedError,
-        }: { data: { ticket_number: string }[] | null; error: unknown } =
-          await supabase.from("project_tickets").select("ticket_number");
-        if (assignedError) throw assignedError;
-        const assignedTicketNumbers = new Set(
-          (assigned || []).map((row) => row.ticket_number)
-        );
+      setTicketsNeedingUpdate(sortedUpdateTickets);
+      setSessionCache("ticketsNeedingUpdate", sortedUpdateTickets);
 
-        // Filter out assigned tickets and only keep active ones
-        const now = new Date();
-        const unassignedTickets = allTickets.filter(
-          (ticket) =>
-            !assignedTicketNumbers.has(ticket.ticket) &&
-            ticket.expires &&
-            new Date(ticket.expires) > now
-        );
-
-        // For each unassigned ticket, check if it's an update of an existing ticket
-        const updatePromises = unassignedTickets.map(async (ticket) => {
-          try {
-            // Get detailed ticket info including original ticket
-            const ticketDetails = await bluestakesService.getTicketByNumber(
-              ticket.ticket,
-              bluestakesToken
-            );
-
-            if (ticketDetails.original_ticket) {
-              // Check if the original ticket is assigned to a project
-              const { data: originalAssignment, error: originalError } =
-                await supabase
-                  .from("project_tickets")
-                  .select("project_id")
-                  .eq("ticket_number", ticketDetails.original_ticket)
-                  .maybeSingle();
-
-              if (originalError) throw originalError;
-
-              if (originalAssignment) {
-                // Update the row to use the new ticket number and replace_by_date
-                const { error: updateError } = await supabase
-                  .from("project_tickets")
-                  .update({
-                    ticket_number: ticket.ticket,
-                    replace_by_date: ticketDetails.replace_by_date,
-                  })
-                  .eq("ticket_number", ticketDetails.original_ticket);
-                if (updateError) throw updateError;
-                return true; // Ticket was updated/assigned
-              }
-            }
-            return false; // No original ticket or no assignment found
-          } catch (error) {
-            console.error(`Error processing ticket ${ticket.ticket}:`, error);
-            return false;
-          }
-        });
-
-        // Wait for all ticket checks to complete
-        const assignmentResults = await Promise.all(updatePromises);
-
-        // Fetch updated assigned tickets after potential updates
-        const { data: updatedAssigned, error: updatedAssignedError } =
-          await supabase.from("project_tickets").select("ticket_number");
-
-        if (updatedAssignedError) throw updatedAssignedError;
-
-        const updatedAssignedTicketNumbers = new Set(
-          (updatedAssigned || []).map((row) => row.ticket_number)
-        );
-
-        // Filter out newly assigned tickets
-        const filteredTickets = unassignedTickets.filter(
-          (ticket, index) =>
-            !assignmentResults[index] &&
-            !updatedAssignedTicketNumbers.has(ticket.ticket)
-        );
-
-        // After all assignment logic, fetch assigned tickets again
-        const { data: finalAssigned, error: finalAssignedError } =
-          await supabase.from("project_tickets").select("ticket_number");
-        if (finalAssignedError) throw finalAssignedError;
-        // Normalize ticket numbers to uppercase strings for comparison
-        const finalAssignedSet = new Set(
-          (finalAssigned || []).map((row) =>
-            String(row.ticket_number).toUpperCase()
-          )
-        );
-
-        // Show all tickets that are NOT assigned and are active
-        const trulyUnassigned = allTickets.filter(
-          (ticket) =>
-            !finalAssignedSet.has(String(ticket.ticket).toUpperCase()) &&
-            ticket.expires &&
-            new Date(ticket.expires) > new Date()
-        );
-        // Debug logs
-        console.log(
-          "All Tickets:",
-          allTickets.map((t) => t.ticket)
-        );
-        console.log("Assigned Tickets:", Array.from(finalAssignedSet));
-        console.log(
-          "Truly Unassigned:",
-          trulyUnassigned.map((t) => t.ticket)
-        );
-        setTickets(trulyUnassigned);
-
-        // Fetch projects for this company
-        if (user && user.company_id) {
-          const { data: companyProjects, error: companyProjectsError } = await supabase
-            .from("projects")
-            .select("id, name")
-            .eq("company_id", user.company_id);
-
-          const projectsList = (companyProjects || []).map((row) => ({
-            project_id: row.id,
-            project_name: row.name,
-          }));
-
-          setProjects(projectsList);
-        } else {
-          setProjects([]);
-        }
-      } catch (err: unknown) {
-        setError(
-          isErrorWithMessage(err) ? err.message : "Failed to fetch tickets"
-        );
-      } finally {
-        setLoading(false);
-        setLoadingUpdates(false);
+      // Then fetch unassigned tickets (your existing logic)
+      // Ensure user has company_id
+      if (user && !user.company_id && typeof setUser === 'function') {
+        const companyId = await ensureUserCompanyId(user, setUser);
+        if (companyId) user.company_id = companyId;
       }
-    };
 
+      // Fetch all tickets
+      const allTickets = await bluestakesService.getAllTickets(bluestakesToken);
+
+      // Fetch all assigned ticket numbers from project_tickets
+      const {
+        data: assigned,
+        error: assignedError,
+      }: { data: { ticket_number: string }[] | null; error: unknown } =
+        await supabase.from("project_tickets").select("ticket_number");
+      if (assignedError) throw assignedError;
+      const assignedTicketNumbers = new Set(
+        (assigned || []).map((row) => row.ticket_number)
+      );
+
+      // Filter out assigned tickets and only keep active ones
+      const now = new Date();
+      const unassignedTickets = allTickets.filter(
+        (ticket) =>
+          !assignedTicketNumbers.has(ticket.ticket) &&
+          ticket.expires &&
+          new Date(ticket.expires) > now
+      );
+
+      // For each unassigned ticket, check if it's an update of an existing ticket
+      const updatePromises = unassignedTickets.map(async (ticket) => {
+        try {
+          // Get detailed ticket info including original ticket
+          const ticketDetails = await bluestakesService.getTicketByNumber(
+            ticket.ticket,
+            bluestakesToken
+          );
+
+          if (ticketDetails.original_ticket) {
+            // Check if the original ticket is assigned to a project
+            const { data: originalAssignment, error: originalError } =
+              await supabase
+                .from("project_tickets")
+                .select("project_id")
+                .eq("ticket_number", ticketDetails.original_ticket)
+                .maybeSingle();
+
+            if (originalError) throw originalError;
+
+            if (originalAssignment) {
+              // Update the row to use the new ticket number and replace_by_date
+              const { error: updateError } = await supabase
+                .from("project_tickets")
+                .update({
+                  ticket_number: ticket.ticket,
+                  replace_by_date: ticketDetails.replace_by_date,
+                })
+                .eq("ticket_number", ticketDetails.original_ticket);
+              if (updateError) throw updateError;
+              return true; // Ticket was updated/assigned
+            }
+          }
+          return false; // No original ticket or no assignment found
+        } catch (error) {
+          console.error(`Error processing ticket ${ticket.ticket}:`, error);
+          return false;
+        }
+      });
+
+      // Wait for all ticket checks to complete
+      const assignmentResults = await Promise.all(updatePromises);
+
+      // Fetch updated assigned tickets after potential updates
+      const { data: updatedAssigned, error: updatedAssignedError } =
+        await supabase.from("project_tickets").select("ticket_number");
+
+      if (updatedAssignedError) throw updatedAssignedError;
+
+      const updatedAssignedTicketNumbers = new Set(
+        (updatedAssigned || []).map((row) => row.ticket_number)
+      );
+
+      // Filter out newly assigned tickets and ensure no duplicates
+      const seenUnassignedTickets = new Set<string>();
+      const filteredTickets = unassignedTickets.filter(
+        (ticket, index) => {
+          if (seenUnassignedTickets.has(ticket.ticket)) return false;
+          if (assignmentResults[index] || updatedAssignedTicketNumbers.has(ticket.ticket)) return false;
+          seenUnassignedTickets.add(ticket.ticket);
+          return true;
+        }
+      );
+
+      setTickets(filteredTickets);
+      setSessionCache("unassignedTickets", filteredTickets);
+
+      // Fetch projects for this company
+      if (user && user.company_id) {
+        const { data: companyProjects, error: companyProjectsError } = await supabase
+          .from("projects")
+          .select("id, name")
+          .eq("company_id", user.company_id);
+
+        const projectsList = (companyProjects || []).map((row) => ({
+          project_id: row.id,
+          project_name: row.name,
+        }));
+
+        setProjects(projectsList);
+      } else {
+        setProjects([]);
+      }
+    } catch (err: unknown) {
+      setError(
+        isErrorWithMessage(err) ? err.message : "Failed to fetch tickets"
+      );
+    } finally {
+      setLoading(false);
+      setLoadingUpdates(false);
+    }
+  }
+
+  useEffect(() => {
     if (user && bluestakesToken) fetchAll();
   }, [user, bluestakesToken]);
 
@@ -489,6 +555,25 @@ export default function UnassignedTickets() {
     }
   };
 
+  const handleManualRefresh = () => {
+    sessionStorage.removeItem("ticketsNeedingUpdate");
+    sessionStorage.removeItem("unassignedTickets");
+    fetchAll();
+  };
+
+  async function handleRowPopover(ticketNumber: string) {
+    setOpenPopoverTicket(ticketNumber);
+    setPopoverLoading(true);
+    try {
+      const ticket = await bluestakesService.getTicketByNumber(ticketNumber, bluestakesToken);
+      setPopoverTicketData((prev) => ({ ...prev, [ticketNumber]: ticket }));
+    } catch {
+      setPopoverTicketData((prev) => ({ ...prev, [ticketNumber]: null }));
+    } finally {
+      setPopoverLoading(false);
+    }
+  }
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -520,6 +605,11 @@ export default function UnassignedTickets() {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-end mb-4">
+          <Button onClick={handleManualRefresh}>
+            Refresh Page Data
+          </Button>
+        </div>
         <Card className="mb-4">
           <CardHeader>
             <CardTitle>Tickets To Update</CardTitle>
@@ -538,7 +628,7 @@ export default function UnassignedTickets() {
                     <TableHead>Ticket Number</TableHead>
                     <TableHead>Project</TableHead>
                     <TableHead>Update Date</TableHead>
-                    <TableHead>Action</TableHead>
+                    <TableHead className="w-40 text-center">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -552,29 +642,52 @@ export default function UnassignedTickets() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    ticketsNeedingUpdate.map((ticket) => (
-                      <TableRow key={ticket.ticket}>
-                        <TableCell>{ticket.ticket}</TableCell>
-                        <TableCell>
-                          {ticketProjects[ticket.ticket] || (
-                            <span className="text-gray-400">Loading...</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {formatDate(ticket.replace_by_date).split(",")[0]}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              onClick={() => handleUpdateTicket(ticket)}
+                    ticketsNeedingUpdate.map((ticket, index) => {
+                      const popTicket = popoverTicketData[ticket.ticket];
+                      const { lat: lat1, lng: lng1 } = popTicket ? getTicketLatLng(popTicket) : { lat: null, lng: null };
+                      const hasMap = popTicket && lat1 !== null && lng1 !== null && popTicket.work_area && popTicket.work_area.type && popTicket.work_area.geometry;
+                      return (
+                        <Popover key={`update-${ticket.ticket}-${index}`} open={openPopoverTicket === ticket.ticket} onOpenChange={(open) => { if (!open) setOpenPopoverTicket(null); }}>
+                          <PopoverTrigger asChild>
+                            <div
+                              role="row"
+                              tabIndex={0}
+                              className="contents cursor-pointer"
+                              onClick={() => handleRowPopover(ticket.ticket)}
                             >
-                              Update
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                              <TableRow>
+                                <TableCell>{ticket.ticket}</TableCell>
+                                <TableCell>
+                                  {ticketProjects[ticket.ticket] || (
+                                    <span className="text-gray-400">Loading...</span>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {formatDate(ticket.replace_by_date).split(",")[0]}
+                                </TableCell>
+                                <TableCell className="w-40 flex justify-center">
+                                  <Button
+                                    size="sm"
+                                    onClick={(e) => { e.stopPropagation(); handleUpdateTicket(ticket); }}
+                                  >
+                                    Update
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            </div>
+                          </PopoverTrigger>
+                          <PopoverContent align="end" sideOffset={8} className="w-[350px] p-0">
+                            {popoverLoading && openPopoverTicket === ticket.ticket ? (
+                              <div className="flex items-center justify-center h-[300px]"><Loader2 className="animate-spin mr-2" /> Loading map...</div>
+                            ) : hasMap ? (
+                              <Map key={ticket.ticket} lat={lat1!} lng={lng1!} workAreaGeoJSON={popTicket.work_area} height="300px" width="100%" showTooltips={false} />
+                            ) : (
+                              <div className="flex items-center justify-center h-[300px] text-gray-500">No map data available</div>
+                            )}
+                          </PopoverContent>
+                        </Popover>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
@@ -600,35 +713,61 @@ export default function UnassignedTickets() {
                     <TableHead>Contact</TableHead>
                     <TableHead>Done For</TableHead>
                     <TableHead>Address</TableHead>
+                    <TableHead className="w-40 text-center">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {tickets.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={7}
+                        colSpan={5}
                         className="text-center text-gray-500 py-8"
                       >
                         All Tickets have been assigned
                       </TableCell>
                     </TableRow>
                   ) : (
-                    tickets.map((ticket) => (
-                      <TableRow key={ticket.ticket}>
-                        <TableCell>{ticket.ticket}</TableCell>
-                        <TableCell>{ticket.contact}</TableCell>
-                        <TableCell>{ticket.done_for}</TableCell>
-                        <TableCell>{formatStreetAddress(ticket)}</TableCell>
-                        <TableCell>
-                          <Button
-                            size="sm"
-                            onClick={() => openAssignModal(ticket)}
-                          >
-                            Assign to Project
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    tickets.map((ticket, index) => {
+                      const popTicket = popoverTicketData[ticket.ticket];
+                      const { lat: lat2, lng: lng2 } = popTicket ? getTicketLatLng(popTicket) : { lat: null, lng: null };
+                      const hasMap = popTicket && lat2 !== null && lng2 !== null && popTicket.work_area && popTicket.work_area.type && popTicket.work_area.geometry;
+                      return (
+                        <Popover key={`unassigned-${ticket.ticket}-${index}`} open={openPopoverTicket === ticket.ticket} onOpenChange={(open) => { if (!open) setOpenPopoverTicket(null); }}>
+                          <PopoverTrigger asChild>
+                            <div
+                              role="row"
+                              tabIndex={0}
+                              className="contents cursor-pointer"
+                              onClick={() => handleRowPopover(ticket.ticket)}
+                            >
+                              <TableRow>
+                                <TableCell>{ticket.ticket}</TableCell>
+                                <TableCell>{ticket.contact}</TableCell>
+                                <TableCell>{ticket.done_for}</TableCell>
+                                <TableCell>{formatStreetAddress(ticket)}</TableCell>
+                                <TableCell className="w-40 flex justify-center">
+                                  <Button
+                                    size="sm"
+                                    onClick={(e) => { e.stopPropagation(); openAssignModal(ticket); }}
+                                  >
+                                    Assign to Project
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            </div>
+                          </PopoverTrigger>
+                          <PopoverContent align="end" sideOffset={8} className="w-[350px] p-0">
+                            {popoverLoading && openPopoverTicket === ticket.ticket ? (
+                              <div className="flex items-center justify-center h-[300px]"><Loader2 className="animate-spin mr-2" /> Loading map...</div>
+                            ) : hasMap ? (
+                              <Map key={ticket.ticket} lat={lat2!} lng={lng2!} workAreaGeoJSON={popTicket.work_area} height="300px" width="100%" showTooltips={false} />
+                            ) : (
+                              <div className="flex items-center justify-center h-[300px] text-gray-500">No map data available</div>
+                            )}
+                          </PopoverContent>
+                        </Popover>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
