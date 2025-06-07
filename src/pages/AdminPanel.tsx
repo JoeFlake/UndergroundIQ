@@ -40,6 +40,9 @@ export default function AdminPanel() {
   const [sendingTestEmail, setSendingTestEmail] = useState(false);
   const [testEmailError, setTestEmailError] = useState<string | null>(null);
   const [testEmailSuccess, setTestEmailSuccess] = useState<string | null>(null);
+  const [userToRemove, setUserToRemove] = useState<Employee | null>(null);
+  const [removingUser, setRemovingUser] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
   // Fetch employees for the company
   const fetchEmployees = async (companyId: number) => {
@@ -131,6 +134,32 @@ export default function AdminPanel() {
     }
   };
 
+  const handleRemoveUser = async () => {
+    if (!userToRemove) return;
+    setRemovingUser(true);
+    setRemoveError(null);
+
+    try {
+      // Remove user from company by setting company_id to null
+      const { error } = await supabase
+        .from("users")
+        .update({ company_id: null })
+        .eq("id", userToRemove.id);
+
+      if (error) throw error;
+
+      // Refresh the employees list
+      if (companyId) {
+        await fetchEmployees(companyId);
+      }
+      setUserToRemove(null);
+    } catch (err) {
+      setRemoveError("Failed to remove user from company");
+    } finally {
+      setRemovingUser(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -159,9 +188,7 @@ export default function AdminPanel() {
               Company: <span className="text-blue-700">{companyName}</span>
             </h3>
             <div className="flex justify-end mb-4">
-              <Button onClick={() => setShowAddUser(true)}>
-                Add User
-              </Button>
+              <Button onClick={() => setShowAddUser(true)}>Add User</Button>
             </div>
             <div className="rounded-md border">
               <Table>
@@ -170,6 +197,7 @@ export default function AdminPanel() {
                     <TableHead>Email</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Created At</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -179,6 +207,16 @@ export default function AdminPanel() {
                       <TableCell>{emp.role}</TableCell>
                       <TableCell>
                         {new Date(emp.created_at).toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => setUserToRemove(emp)}
+                          disabled={emp.id === user?.id}
+                        >
+                          Remove
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -232,6 +270,41 @@ export default function AdminPanel() {
                   }
                 >
                   {addingUser ? "Adding..." : "Add User"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Remove User Confirmation Modal */}
+        {userToRemove && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
+            <div className="bg-white rounded-lg shadow-lg p-6 w-96">
+              <h2 className="text-xl font-bold mb-4">Remove User</h2>
+              {removeError && (
+                <p className="text-red-500 mb-2">{removeError}</p>
+              )}
+              <p className="mb-4">
+                Are you sure you want to remove {userToRemove.email} from the
+                company? This action cannot be undone.
+              </p>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setUserToRemove(null);
+                    setRemoveError(null);
+                  }}
+                  disabled={removingUser}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleRemoveUser}
+                  disabled={removingUser}
+                >
+                  {removingUser ? "Removing..." : "Remove User"}
                 </Button>
               </div>
             </div>

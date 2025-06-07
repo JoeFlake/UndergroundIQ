@@ -7,6 +7,7 @@ import {
   Home as HomeIcon,
   CheckSquare,
   Shield,
+  Search,
 } from "lucide-react";
 import logo from "../assets/images/LogoWide.png";
 import { useEffect, useState } from "react";
@@ -17,6 +18,7 @@ export function Navbar() {
   const location = useLocation();
   const { user, signOut } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     const fetchRole = async () => {
@@ -55,6 +57,14 @@ export function Navbar() {
     )
       return true;
     return location.pathname.startsWith(path) && path !== "/";
+  };
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/tickets/${searchQuery.trim()}`);
+      setSearchQuery("");
+    }
   };
 
   return (
@@ -107,12 +117,18 @@ export function Navbar() {
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            <div className="flex items-center bg-gray-50 p-2 rounded-lg border border-gray-200">
-              <User className="h-5 w-5 text-gray-600 mr-2" />
-              <span className="text-sm font-medium text-gray-700">
-                {user?.username}
-              </span>
-            </div>
+            <form onSubmit={handleSearch} className="flex items-center">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search ticket..."
+                  className="w-48 pl-3 pr-10 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                />
+                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              </div>
+            </form>
             <Button
               variant="outline"
               onClick={handleSignOut}
