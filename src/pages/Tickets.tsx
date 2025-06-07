@@ -120,14 +120,32 @@ export default function Tickets() {
   const [newTicketNumber, setNewTicketNumber] = useState("");
   const [isAddingTicket, setIsAddingTicket] = useState(false);
   const [isEnrichingTickets, setIsEnrichingTickets] = useState(false);
-  const [projectCenter, setProjectCenter] = useState<{lat: number, lng: number} | null>(null);
+  const [projectCenter, setProjectCenter] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
   const [projectWorkArea, setProjectWorkArea] = useState<any>(null);
 
   // Add dummy assignees data
   const projectAssignees = [
-    { id: 1, name: "John Smith", role: "Project Manager", email: "john.smith@example.com" },
-    { id: 2, name: "Sarah Johnson", role: "Field Supervisor", email: "sarah.j@example.com" },
-    { id: 3, name: "Mike Wilson", role: "Crew Lead", email: "mike.w@example.com" },
+    {
+      id: 1,
+      name: "John Smith",
+      role: "Project Manager",
+      email: "john.smith@example.com",
+    },
+    {
+      id: 2,
+      name: "Sarah Johnson",
+      role: "Field Supervisor",
+      email: "sarah.j@example.com",
+    },
+    {
+      id: 3,
+      name: "Mike Wilson",
+      role: "Crew Lead",
+      email: "mike.w@example.com",
+    },
   ];
 
   useEffect(() => {
@@ -215,19 +233,14 @@ export default function Tickets() {
               ...ticket,
               bluestakes_data: bluestakesData,
             };
-          } catch (err) {
-            console.error(
-              `Failed to fetch BlueStakes data for ticket ${ticket.ticket_number}:`,
-              err
-            );
+          } catch (err: unknown) {
             return ticket;
           }
         })
       );
 
       setTickets(enrichedTickets);
-    } catch (err) {
-      console.error("Error enriching tickets:", err);
+    } catch (err: unknown) {
       toast({
         title: "Warning",
         description: "Some ticket data may be incomplete",
@@ -432,8 +445,9 @@ export default function Tickets() {
 
   // Add function to calculate project center and work area from tickets
   const calculateProjectLocation = (tickets: ProjectTicket[]) => {
-    const activeTickets = tickets.filter(ticket => 
-      ticket.bluestakes_data && getStatus(ticket.bluestakes_data) === "Active"
+    const activeTickets = tickets.filter(
+      (ticket) =>
+        ticket.bluestakes_data && getStatus(ticket.bluestakes_data) === "Active"
     );
 
     if (activeTickets.length === 0) return;
@@ -445,7 +459,7 @@ export default function Tickets() {
 
     // Collect all valid work areas
     const workAreas = activeTickets
-      .filter(ticket => {
+      .filter((ticket) => {
         const lat = ticket.bluestakes_data?.latitude;
         const lng = ticket.bluestakes_data?.longitude;
         if (!lat || !lng) return false;
@@ -459,19 +473,19 @@ export default function Tickets() {
         }
         return false;
       })
-      .map(ticket => ({
+      .map((ticket) => ({
         ...ticket.bluestakes_data!.work_area,
         properties: {
           ...ticket.bluestakes_data!.work_area.properties,
           ticketNumber: ticket.ticket_number,
-          status: getStatus(ticket.bluestakes_data)
-        }
+          status: getStatus(ticket.bluestakes_data),
+        },
       }));
 
     if (validTickets > 0) {
       setProjectCenter({
         lat: totalLat / validTickets,
-        lng: totalLng / validTickets
+        lng: totalLng / validTickets,
       });
     }
 
@@ -479,7 +493,7 @@ export default function Tickets() {
     if (workAreas.length > 0) {
       setProjectWorkArea({
         type: "FeatureCollection",
-        features: workAreas
+        features: workAreas,
       });
     }
   };
@@ -604,7 +618,9 @@ export default function Tickets() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-6">
                     <div>
-                      <h4 className="text-sm font-medium mb-2">Project Details</h4>
+                      <h4 className="text-sm font-medium mb-2">
+                        Project Details
+                      </h4>
                       <div className="space-y-2">
                         <div className="text-sm text-muted-foreground">
                           Active Tickets: {activeTickets.length}
@@ -612,17 +628,31 @@ export default function Tickets() {
                       </div>
                     </div>
                     <div>
-                      <h4 className="text-sm font-medium mb-2">Project Assignees</h4>
+                      <h4 className="text-sm font-medium mb-2">
+                        Project Assignees
+                      </h4>
                       <div className="space-y-3">
                         {projectAssignees.map((assignee) => (
-                          <div key={assignee.id} className="flex items-start space-x-3">
+                          <div
+                            key={assignee.id}
+                            className="flex items-start space-x-3"
+                          >
                             <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600">
-                              {assignee.name.split(' ').map(n => n[0]).join('')}
+                              {assignee.name
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")}
                             </div>
                             <div>
-                              <div className="text-sm font-medium">{assignee.name}</div>
-                              <div className="text-xs text-muted-foreground">{assignee.role}</div>
-                              <div className="text-xs text-muted-foreground">{assignee.email}</div>
+                              <div className="text-sm font-medium">
+                                {assignee.name}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {assignee.role}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {assignee.email}
+                              </div>
                             </div>
                           </div>
                         ))}

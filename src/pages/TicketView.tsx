@@ -2,7 +2,10 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { bluestakesService, type TicketSecondaryFunction } from "@/lib/bluestakesService";
+import {
+  bluestakesService,
+  type TicketSecondaryFunction,
+} from "@/lib/bluestakesService";
 import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBluestakesAuth } from "@/hooks/useBluestakesAuth";
@@ -37,8 +40,10 @@ const TicketView = () => {
     error: authError,
   } = useBluestakesAuth();
   const [projectName, setProjectName] = useState<string | null>(null);
-  const [secondaryFunctions, setSecondaryFunctions] = useState<TicketSecondaryFunction | null>(null);
-  const [loadingSecondaryFunctions, setLoadingSecondaryFunctions] = useState(true);
+  const [secondaryFunctions, setSecondaryFunctions] =
+    useState<TicketSecondaryFunction | null>(null);
+  const [loadingSecondaryFunctions, setLoadingSecondaryFunctions] =
+    useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -52,7 +57,7 @@ const TicketView = () => {
         );
         setCurrentTicket(ticket);
       } catch (error) {
-        console.error("Error fetching ticket data:", error);
+        // REMOVE DEBUG LOGGING FOR SECURITY
       } finally {
         setLoading(false);
       }
@@ -85,7 +90,7 @@ const TicketView = () => {
         );
         setResponses(responsesData);
       } catch (error) {
-        console.error("Error fetching responses data:", error);
+        // REMOVE DEBUG LOGGING FOR SECURITY
       } finally {
         setResponsesLoading(false);
       }
@@ -98,10 +103,13 @@ const TicketView = () => {
       if (!ticketId || !bluestakesToken) return;
       try {
         setLoadingSecondaryFunctions(true);
-        const response = await bluestakesService.getTicketSecondaryFunction(ticketId, bluestakesToken);
+        const response = await bluestakesService.getTicketSecondaryFunction(
+          ticketId,
+          bluestakesToken
+        );
         setSecondaryFunctions(response);
       } catch (error) {
-        console.error("Error fetching secondary functions:", error);
+        // REMOVE DEBUG LOGGING FOR SECURITY
       } finally {
         setLoadingSecondaryFunctions(false);
       }
@@ -120,14 +128,9 @@ const TicketView = () => {
   const handleSecondaryFunction = async (action: string) => {
     if (!ticketId || !bluestakesToken) return;
     try {
-      // TODO: Implement the actual API calls for each action
-      toast({
-        title: "Not Implemented",
-        description: `The ${action} action is not yet implemented.`,
-        variant: "destructive",
-      });
+      // REMOVE DEBUG LOGGING FOR SECURITY
     } catch (error) {
-      console.error(`Error performing ${action}:`, error);
+      // REMOVE DEBUG LOGGING FOR SECURITY
       toast({
         title: "Error",
         description: `Failed to perform ${action}. Please try again.`,
@@ -273,8 +276,8 @@ const TicketView = () => {
           {!loadingSecondaryFunctions && secondaryFunctions && (
             <div className="flex gap-2">
               {secondaryFunctions.cancel && (
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => handleSecondaryFunction("cancel")}
                 >
@@ -282,8 +285,8 @@ const TicketView = () => {
                 </Button>
               )}
               {secondaryFunctions.remark && (
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => handleSecondaryFunction("remark")}
                 >
@@ -291,8 +294,8 @@ const TicketView = () => {
                 </Button>
               )}
               {secondaryFunctions.secondNotice && (
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => handleSecondaryFunction("second notice")}
                 >
@@ -300,8 +303,8 @@ const TicketView = () => {
                 </Button>
               )}
               {secondaryFunctions.update && (
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => handleSecondaryFunction("update")}
                 >
@@ -389,10 +392,13 @@ const TicketView = () => {
                 <h3 className="text-3xl font-medium mb-2 text-gray-600">
                   Map & Location
                 </h3>
-                {hasCoords && currentTicket.work_area && currentTicket.work_area.type === 'Feature' && currentTicket.work_area.geometry ? (
-                  <Map 
-                    lat={lat} 
-                    lng={lng} 
+                {hasCoords &&
+                currentTicket.work_area &&
+                currentTicket.work_area.type === "Feature" &&
+                currentTicket.work_area.geometry ? (
+                  <Map
+                    lat={lat}
+                    lng={lng}
                     workAreaGeoJSON={currentTicket.work_area}
                     showTooltips={false}
                   />

@@ -33,7 +33,11 @@ import {
   DialogTitle,
   DialogFooter,
 } from "../components/ui/dialog";
-import { Popover, PopoverTrigger, PopoverContent } from "../components/ui/popover";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "../components/ui/popover";
 import { Map } from "../components/Map";
 import { Loader2 } from "lucide-react";
 
@@ -101,13 +105,17 @@ function getSessionCache(key) {
   }
 }
 
-function setSessionCache(key, value, ttlMs = 5 * 60 * 1000) { // 5 min default
+function setSessionCache(key, value, ttlMs = 5 * 60 * 1000) {
+  // 5 min default
   const record = { value, expiry: Date.now() + ttlMs };
   sessionStorage.setItem(key, JSON.stringify(record));
 }
 
 // Helper to parse coordinates robustly (matches TicketView logic)
-function getTicketLatLng(ticket: any): { lat: number | null, lng: number | null } {
+function getTicketLatLng(ticket: any): {
+  lat: number | null;
+  lng: number | null;
+} {
   function parseCoord(val: any): number | null {
     if (typeof val === "number") return val;
     if (!val) return null;
@@ -183,11 +191,15 @@ export default function UnassignedTickets() {
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [creatingProject, setCreatingProject] = useState(false);
-  const [openPopoverTicket, setOpenPopoverTicket] = useState<string | null>(null);
-  const [popoverTicketData, setPopoverTicketData] = useState<Record<string, any>>({});
+  const [openPopoverTicket, setOpenPopoverTicket] = useState<string | null>(
+    null
+  );
+  const [popoverTicketData, setPopoverTicketData] = useState<
+    Record<string, any>
+  >({});
   const [popoverLoading, setPopoverLoading] = useState(false);
 
-  const openBluestakesWindow = useWindowReference('bluestakes_ticket_entry');
+  const openBluestakesWindow = useWindowReference("bluestakes_ticket_entry");
 
   // Add function to get project name for a ticket
   const getProjectForTicket = async (ticketNumber: string) => {
@@ -203,8 +215,7 @@ export default function UnassignedTickets() {
         ? data.projects[0]
         : data?.projects;
       return project?.name || "Unassigned";
-    } catch (error) {
-      console.error("Error fetching project for ticket:", error);
+    } catch (error: unknown) {
       return "Unassigned";
     }
   };
@@ -235,11 +246,12 @@ export default function UnassignedTickets() {
 
     try {
       // Fetch tickets needing update first
-      const updateTickets = await bluestakesService.getTicketsNeedingUpdate(bluestakesToken);
-      
+      const updateTickets =
+        await bluestakesService.getTicketsNeedingUpdate(bluestakesToken);
+
       // Filter out duplicates from updateTickets using a Set
       const seenUpdateTickets = new Set<string>();
-      const uniqueUpdateTickets = updateTickets.filter(ticket => {
+      const uniqueUpdateTickets = updateTickets.filter((ticket) => {
         if (seenUpdateTickets.has(ticket.ticket)) return false;
         seenUpdateTickets.add(ticket.ticket);
         return true;
@@ -247,8 +259,12 @@ export default function UnassignedTickets() {
 
       // Sort tickets by replace_by_date in ascending order
       const sortedUpdateTickets = uniqueUpdateTickets.sort((a, b) => {
-        const dateA = a.replace_by_date ? new Date(a.replace_by_date).getTime() : Infinity;
-        const dateB = b.replace_by_date ? new Date(b.replace_by_date).getTime() : Infinity;
+        const dateA = a.replace_by_date
+          ? new Date(a.replace_by_date).getTime()
+          : Infinity;
+        const dateB = b.replace_by_date
+          ? new Date(b.replace_by_date).getTime()
+          : Infinity;
         return dateA - dateB;
       });
 
@@ -257,7 +273,7 @@ export default function UnassignedTickets() {
 
       // Then fetch unassigned tickets (your existing logic)
       // Ensure user has company_id
-      if (user && !user.company_id && typeof setUser === 'function') {
+      if (user && !user.company_id && typeof setUser === "function") {
         const companyId = await ensureUserCompanyId(user, setUser);
         if (companyId) user.company_id = companyId;
       }
@@ -319,8 +335,7 @@ export default function UnassignedTickets() {
             }
           }
           return false; // No original ticket or no assignment found
-        } catch (error) {
-          console.error(`Error processing ticket ${ticket.ticket}:`, error);
+        } catch (error: unknown) {
           return false;
         }
       });
@@ -340,24 +355,27 @@ export default function UnassignedTickets() {
 
       // Filter out newly assigned tickets and ensure no duplicates
       const seenUnassignedTickets = new Set<string>();
-      const filteredTickets = unassignedTickets.filter(
-        (ticket, index) => {
-          if (seenUnassignedTickets.has(ticket.ticket)) return false;
-          if (assignmentResults[index] || updatedAssignedTicketNumbers.has(ticket.ticket)) return false;
-          seenUnassignedTickets.add(ticket.ticket);
-          return true;
-        }
-      );
+      const filteredTickets = unassignedTickets.filter((ticket, index) => {
+        if (seenUnassignedTickets.has(ticket.ticket)) return false;
+        if (
+          assignmentResults[index] ||
+          updatedAssignedTicketNumbers.has(ticket.ticket)
+        )
+          return false;
+        seenUnassignedTickets.add(ticket.ticket);
+        return true;
+      });
 
       setTickets(filteredTickets);
       setSessionCache("unassignedTickets", filteredTickets);
 
       // Fetch projects for this company
       if (user && user.company_id) {
-        const { data: companyProjects, error: companyProjectsError } = await supabase
-          .from("projects")
-          .select("id, name")
-          .eq("company_id", user.company_id);
+        const { data: companyProjects, error: companyProjectsError } =
+          await supabase
+            .from("projects")
+            .select("id, name")
+            .eq("company_id", user.company_id);
 
         const projectsList = (companyProjects || []).map((row) => ({
           project_id: row.id,
@@ -459,7 +477,7 @@ export default function UnassignedTickets() {
   const handleUpdateTicket = async (ticket: Ticket) => {
     try {
       const ticketUrl = `https://newtin.bluestakes.org/newtinweb/UTAH_ticketentry.html`;
-      
+
       // Copy ticket number to clipboard
       await navigator.clipboard.writeText(ticket.ticket);
 
@@ -584,7 +602,10 @@ export default function UnassignedTickets() {
     setOpenPopoverTicket(ticketNumber);
     setPopoverLoading(true);
     try {
-      const ticket = await bluestakesService.getTicketByNumber(ticketNumber, bluestakesToken);
+      const ticket = await bluestakesService.getTicketByNumber(
+        ticketNumber,
+        bluestakesToken
+      );
       setPopoverTicketData((prev) => ({ ...prev, [ticketNumber]: ticket }));
     } catch {
       setPopoverTicketData((prev) => ({ ...prev, [ticketNumber]: null }));
@@ -625,9 +646,7 @@ export default function UnassignedTickets() {
       <Navbar />
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-end mb-4">
-          <Button onClick={handleManualRefresh}>
-            Refresh Page Data
-          </Button>
+          <Button onClick={handleManualRefresh}>Refresh Page Data</Button>
         </div>
         <Card className="mb-4">
           <CardHeader>
@@ -663,10 +682,24 @@ export default function UnassignedTickets() {
                   ) : (
                     ticketsNeedingUpdate.map((ticket, index) => {
                       const popTicket = popoverTicketData[ticket.ticket];
-                      const { lat: lat1, lng: lng1 } = popTicket ? getTicketLatLng(popTicket) : { lat: null, lng: null };
-                      const hasMap = popTicket && lat1 !== null && lng1 !== null && popTicket.work_area && popTicket.work_area.type && popTicket.work_area.geometry;
+                      const { lat: lat1, lng: lng1 } = popTicket
+                        ? getTicketLatLng(popTicket)
+                        : { lat: null, lng: null };
+                      const hasMap =
+                        popTicket &&
+                        lat1 !== null &&
+                        lng1 !== null &&
+                        popTicket.work_area &&
+                        popTicket.work_area.type &&
+                        popTicket.work_area.geometry;
                       return (
-                        <Popover key={`update-${ticket.ticket}-${index}`} open={openPopoverTicket === ticket.ticket} onOpenChange={(open) => { if (!open) setOpenPopoverTicket(null); }}>
+                        <Popover
+                          key={`update-${ticket.ticket}-${index}`}
+                          open={openPopoverTicket === ticket.ticket}
+                          onOpenChange={(open) => {
+                            if (!open) setOpenPopoverTicket(null);
+                          }}
+                        >
                           <PopoverTrigger asChild>
                             <div
                               role="row"
@@ -678,16 +711,25 @@ export default function UnassignedTickets() {
                                 <TableCell>{ticket.ticket}</TableCell>
                                 <TableCell>
                                   {ticketProjects[ticket.ticket] || (
-                                    <span className="text-gray-400">Loading...</span>
+                                    <span className="text-gray-400">
+                                      Loading...
+                                    </span>
                                   )}
                                 </TableCell>
                                 <TableCell>
-                                  {formatDate(ticket.replace_by_date).split(",")[0]}
+                                  {
+                                    formatDate(ticket.replace_by_date).split(
+                                      ","
+                                    )[0]
+                                  }
                                 </TableCell>
                                 <TableCell className="w-40 flex justify-center">
                                   <Button
                                     size="sm"
-                                    onClick={(e) => { e.stopPropagation(); handleUpdateTicket(ticket); }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleUpdateTicket(ticket);
+                                    }}
                                   >
                                     Update
                                   </Button>
@@ -695,13 +737,31 @@ export default function UnassignedTickets() {
                               </TableRow>
                             </div>
                           </PopoverTrigger>
-                          <PopoverContent align="end" sideOffset={8} className="w-[350px] p-0">
-                            {popoverLoading && openPopoverTicket === ticket.ticket ? (
-                              <div className="flex items-center justify-center h-[300px]"><Loader2 className="animate-spin mr-2" /> Loading map...</div>
+                          <PopoverContent
+                            align="end"
+                            sideOffset={8}
+                            className="w-[350px] p-0"
+                          >
+                            {popoverLoading &&
+                            openPopoverTicket === ticket.ticket ? (
+                              <div className="flex items-center justify-center h-[300px]">
+                                <Loader2 className="animate-spin mr-2" />{" "}
+                                Loading map...
+                              </div>
                             ) : hasMap ? (
-                              <Map key={ticket.ticket} lat={lat1!} lng={lng1!} workAreaGeoJSON={popTicket.work_area} height="300px" width="100%" showTooltips={false} />
+                              <Map
+                                key={ticket.ticket}
+                                lat={lat1!}
+                                lng={lng1!}
+                                workAreaGeoJSON={popTicket.work_area}
+                                height="300px"
+                                width="100%"
+                                showTooltips={false}
+                              />
                             ) : (
-                              <div className="flex items-center justify-center h-[300px] text-gray-500">No map data available</div>
+                              <div className="flex items-center justify-center h-[300px] text-gray-500">
+                                No map data available
+                              </div>
                             )}
                           </PopoverContent>
                         </Popover>
@@ -748,10 +808,24 @@ export default function UnassignedTickets() {
                   ) : (
                     tickets.map((ticket, index) => {
                       const popTicket = popoverTicketData[ticket.ticket];
-                      const { lat: lat2, lng: lng2 } = popTicket ? getTicketLatLng(popTicket) : { lat: null, lng: null };
-                      const hasMap = popTicket && lat2 !== null && lng2 !== null && popTicket.work_area && popTicket.work_area.type && popTicket.work_area.geometry;
+                      const { lat: lat2, lng: lng2 } = popTicket
+                        ? getTicketLatLng(popTicket)
+                        : { lat: null, lng: null };
+                      const hasMap =
+                        popTicket &&
+                        lat2 !== null &&
+                        lng2 !== null &&
+                        popTicket.work_area &&
+                        popTicket.work_area.type &&
+                        popTicket.work_area.geometry;
                       return (
-                        <Popover key={`unassigned-${ticket.ticket}-${index}`} open={openPopoverTicket === ticket.ticket} onOpenChange={(open) => { if (!open) setOpenPopoverTicket(null); }}>
+                        <Popover
+                          key={`unassigned-${ticket.ticket}-${index}`}
+                          open={openPopoverTicket === ticket.ticket}
+                          onOpenChange={(open) => {
+                            if (!open) setOpenPopoverTicket(null);
+                          }}
+                        >
                           <PopoverTrigger asChild>
                             <div
                               role="row"
@@ -763,11 +837,16 @@ export default function UnassignedTickets() {
                                 <TableCell>{ticket.ticket}</TableCell>
                                 <TableCell>{ticket.contact}</TableCell>
                                 <TableCell>{ticket.done_for}</TableCell>
-                                <TableCell>{formatStreetAddress(ticket)}</TableCell>
+                                <TableCell>
+                                  {formatStreetAddress(ticket)}
+                                </TableCell>
                                 <TableCell className="w-40 flex justify-center">
                                   <Button
                                     size="sm"
-                                    onClick={(e) => { e.stopPropagation(); openAssignModal(ticket); }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openAssignModal(ticket);
+                                    }}
                                   >
                                     Assign to Project
                                   </Button>
@@ -775,13 +854,31 @@ export default function UnassignedTickets() {
                               </TableRow>
                             </div>
                           </PopoverTrigger>
-                          <PopoverContent align="end" sideOffset={8} className="w-[350px] p-0">
-                            {popoverLoading && openPopoverTicket === ticket.ticket ? (
-                              <div className="flex items-center justify-center h-[300px]"><Loader2 className="animate-spin mr-2" /> Loading map...</div>
+                          <PopoverContent
+                            align="end"
+                            sideOffset={8}
+                            className="w-[350px] p-0"
+                          >
+                            {popoverLoading &&
+                            openPopoverTicket === ticket.ticket ? (
+                              <div className="flex items-center justify-center h-[300px]">
+                                <Loader2 className="animate-spin mr-2" />{" "}
+                                Loading map...
+                              </div>
                             ) : hasMap ? (
-                              <Map key={ticket.ticket} lat={lat2!} lng={lng2!} workAreaGeoJSON={popTicket.work_area} height="300px" width="100%" showTooltips={false} />
+                              <Map
+                                key={ticket.ticket}
+                                lat={lat2!}
+                                lng={lng2!}
+                                workAreaGeoJSON={popTicket.work_area}
+                                height="300px"
+                                width="100%"
+                                showTooltips={false}
+                              />
                             ) : (
-                              <div className="flex items-center justify-center h-[300px] text-gray-500">No map data available</div>
+                              <div className="flex items-center justify-center h-[300px] text-gray-500">
+                                No map data available
+                              </div>
                             )}
                           </PopoverContent>
                         </Popover>

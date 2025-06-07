@@ -170,9 +170,12 @@ const BASE_URL = "https://newtiny-api.bluestakes.org/api";
 
 function getLatestRevisions(tickets: BlueStakesTicket[]): BlueStakesTicket[] {
   return tickets.reduce((acc, ticket) => {
-    const existingTicket = acc.find(t => t.ticket === ticket.ticket);
-    if (!existingTicket || Number(ticket.revision) > Number(existingTicket.revision)) {
-      const filtered = acc.filter(t => t.ticket !== ticket.ticket);
+    const existingTicket = acc.find((t) => t.ticket === ticket.ticket);
+    if (
+      !existingTicket ||
+      Number(ticket.revision) > Number(existingTicket.revision)
+    ) {
+      const filtered = acc.filter((t) => t.ticket !== ticket.ticket);
       return [...filtered, ticket];
     }
     return acc;
@@ -186,18 +189,18 @@ export const bluestakesService = {
     let offset = 0;
     const now = new Date();
     const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
-    const start = fourWeeksAgo.toISOString().split('T')[0]; // YYYY-MM-DD
-    const end = now.toISOString().split('T')[0]; // Today's date in YYYY-MM-DD
+    const start = fourWeeksAgo.toISOString().split("T")[0]; // YYYY-MM-DD
+    const end = now.toISOString().split("T")[0]; // Today's date in YYYY-MM-DD
     let hasMore = true;
 
     try {
       while (hasMore) {
         // URL format: .../tickets/search?limit=100&start=YYYY-MM-DD&end=YYYY-MM-DD
         const url = new URL(`${BASE_URL}/tickets/search`);
-        url.searchParams.append('limit', limit.toString());
-        url.searchParams.append('start', start);
-        url.searchParams.append('end', end);
-        if (offset > 0) url.searchParams.append('offset', offset.toString());
+        url.searchParams.append("limit", limit.toString());
+        url.searchParams.append("start", start);
+        url.searchParams.append("end", end);
+        if (offset > 0) url.searchParams.append("offset", offset.toString());
 
         const response = await fetch(url.toString(), {
           method: "GET",
@@ -212,7 +215,9 @@ export const bluestakesService = {
         }
 
         const responseData = await response.json();
-        const pageTickets = Array.isArray(responseData) ? responseData : responseData.data || [];
+        const pageTickets = Array.isArray(responseData)
+          ? responseData
+          : responseData.data || [];
         tickets.push(...pageTickets);
         if (pageTickets.length < limit) hasMore = false;
         else offset += limit;
@@ -224,7 +229,10 @@ export const bluestakesService = {
     }
   },
 
-  async getTicketSecondaryFunction(ticketNumber: string, token: string): Promise<TicketSecondaryFunction> {
+  async getTicketSecondaryFunction(
+    ticketNumber: string,
+    token: string
+  ): Promise<TicketSecondaryFunction> {
     try {
       const response = await fetch(
         `${BASE_URL}/tickets/${ticketNumber}/secondary-functions`,
@@ -238,18 +246,26 @@ export const bluestakesService = {
       );
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch secondary functions for ticket ${ticketNumber}`);
+        throw new Error(
+          `Failed to fetch secondary functions for ticket ${ticketNumber}`
+        );
       }
 
       const data = await response.json();
       return data;
     } catch (error) {
-      console.error(`Error fetching secondary functions for ticket ${ticketNumber}:`, error);
+      console.error(
+        `Error fetching secondary functions for ticket ${ticketNumber}:`,
+        error
+      );
       throw error;
     }
   },
 
-  async getTicketByNumber(ticketNumber: string, token: string): Promise<BlueStakesTicket> {
+  async getTicketByNumber(
+    ticketNumber: string,
+    token: string
+  ): Promise<BlueStakesTicket> {
     const authHeader = token.startsWith("Bearer ") ? token : "Bearer " + token;
     const response = await fetch(`${BASE_URL}/tickets/${ticketNumber}`, {
       headers: {
@@ -260,49 +276,62 @@ export const bluestakesService = {
     if (!response.ok) throw new Error("Failed to fetch ticket");
     return await response.json();
   },
-  
-  async getResponsesByTicket(ticketNumber: string, token: string): Promise<BlueStakesResponse[]> {
+
+  async getResponsesByTicket(
+    ticketNumber: string,
+    token: string
+  ): Promise<BlueStakesResponse[]> {
     try {
-      const authHeader = token.startsWith("Bearer ") ? token : "Bearer " + token;
-      const response = await fetch(`${BASE_URL}/tickets/${ticketNumber}/responses`, {
-        headers: {
-          accept: "application/json",
-          Authorization: authHeader,
-        },
-      });
+      const authHeader = token.startsWith("Bearer ")
+        ? token
+        : "Bearer " + token;
+      const response = await fetch(
+        `${BASE_URL}/tickets/${ticketNumber}/responses`,
+        {
+          headers: {
+            accept: "application/json",
+            Authorization: authHeader,
+          },
+        }
+      );
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to fetch ticket responses");
+        throw new Error(
+          errorData.message || "Failed to fetch ticket responses"
+        );
       }
       const data = await response.json();
-      
+
       // Extract the responses array from the ticket object
       const ticketData = Array.isArray(data) ? data[0] : data;
       const responses = ticketData?.responses || [];
-      
+
       // Validate and normalize each response
       const validatedResponses = responses.map((resp, index) => {
         return {
           member_id: resp.member_id || 0,
           ticket: resp.ticket || ticketNumber,
-          revision: resp.revision || '',
-          response: resp.response || '',
-          responded: resp.responded || '',
-          response_by: resp.response_by || '',
-          source: resp.source || '',
-          sys_id: resp.sys_id || '',
-          comments: resp.comments || '',
-          description: resp.description || '',
-          mbcode: resp.mbcode || '',
-          mbname: resp.name || '', // Note: API uses 'name' instead of 'mbname'
-          mbdescription: resp.mbdescription || '',
-          status: resp.status || '' // Add status field
+          revision: resp.revision || "",
+          response: resp.response || "",
+          responded: resp.responded || "",
+          response_by: resp.response_by || "",
+          source: resp.source || "",
+          sys_id: resp.sys_id || "",
+          comments: resp.comments || "",
+          description: resp.description || "",
+          mbcode: resp.mbcode || "",
+          mbname: resp.name || "", // Note: API uses 'name' instead of 'mbname'
+          mbdescription: resp.mbdescription || "",
+          status: resp.status || "", // Add status field
         };
       });
-      
+
       return validatedResponses;
     } catch (error) {
-      console.error(`Error fetching responses for ticket ${ticketNumber}:`, error);
+      console.error(
+        `Error fetching responses for ticket ${ticketNumber}:`,
+        error
+      );
       throw error;
     }
   },
@@ -333,41 +362,57 @@ export const bluestakesService = {
             const ticket = await this.getTicketByNumber(ticket_number, token);
             return ticket;
           } catch (error) {
-            console.error(`Error fetching details for ticket ${ticket_number}:`, error);
+            console.error(
+              `Error fetching details for ticket ${ticket_number}:`,
+              error
+            );
             return null;
           }
         })
       );
 
       // Filter tickets that are within 7 days of their replace_by_date
-      const ticketsToCheck = ticketDetails.filter((ticket): ticket is BlueStakesTicket => {
-        if (!ticket?.replace_by_date) return false;
-        const replaceDate = new Date(ticket.replace_by_date);
-        return replaceDate <= sevenDaysFromNow && replaceDate >= new Date();
-      });
+      const ticketsToCheck = ticketDetails.filter(
+        (ticket): ticket is BlueStakesTicket => {
+          if (!ticket?.replace_by_date) return false;
+          const replaceDate = new Date(ticket.replace_by_date);
+          return replaceDate <= sevenDaysFromNow && replaceDate >= new Date();
+        }
+      );
 
       // Check secondary functions for filtered tickets
       const ticketsNeedingUpdate = await Promise.all(
         ticketsToCheck.map(async (ticket) => {
           try {
-            const secondaryFunction = await this.getTicketSecondaryFunction(ticket.ticket, token);
+            const secondaryFunction = await this.getTicketSecondaryFunction(
+              ticket.ticket,
+              token
+            );
             return secondaryFunction.update ? ticket : null;
           } catch (error) {
-            console.error(`Error checking secondary functions for ticket ${ticket.ticket}:`, error);
+            console.error(
+              `Error checking secondary functions for ticket ${ticket.ticket}:`,
+              error
+            );
             return null;
           }
         })
       );
 
       // Filter out null values (tickets that don't need updates or had errors)
-      return ticketsNeedingUpdate.filter((ticket): ticket is BlueStakesTicket => ticket !== null);
+      return ticketsNeedingUpdate.filter(
+        (ticket): ticket is BlueStakesTicket => ticket !== null
+      );
     } catch (error) {
       console.error("Error fetching tickets needing update:", error);
       throw error;
     }
   },
 
-  async assignTicketToProject(ticketNumber: string, projectId: string): Promise<void> {
+  async assignTicketToProject(
+    ticketNumber: string,
+    projectId: string
+  ): Promise<void> {
     const { error } = await supabase
       .from("project_tickets")
       .insert([{ project_id: projectId, ticket_number: ticketNumber }]);
@@ -375,5 +420,24 @@ export const bluestakesService = {
     if (error) {
       throw new Error(`Failed to assign ticket to project: ${error.message}`);
     }
+  },
+
+  async loginToBluestakes(username: string, password: string): Promise<string> {
+    const loginResp = await fetch(
+      "https://newtin-api.bluestakes.org/api/login",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          username,
+          password,
+        }).toString(),
+      }
+    );
+    const loginData = await loginResp.json();
+    if (!loginResp.ok || !loginData.Authorization) {
+      throw new Error("Failed to log in to Blue Stakes");
+    }
+    return loginData.Authorization.replace("Bearer ", "");
   },
 };

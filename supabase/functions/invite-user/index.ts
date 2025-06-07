@@ -21,9 +21,6 @@ serve(async (req) => {
       );
     }
 
-    console.log("PROJECT_URL:", Deno.env.get("PROJECT_URL"));
-    console.log("SERVICE_ROLE_KEY:", Deno.env.get("SERVICE_ROLE_KEY"));
-
     // USE THE NEW SECRET NAMES HERE:
     const supabase = createClient(
       Deno.env.get("PROJECT_URL")!, // <--- not SUPABASE_URL
