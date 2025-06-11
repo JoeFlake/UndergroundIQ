@@ -54,6 +54,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { Label } from "@/components/ui/label";
 import { Map } from "../components/Map";
+import { Select } from "@/components/ui/select";
 
 // Remove the Ticket type import and use BlueStakesTicket instead
 type Ticket = BlueStakesTicket;
@@ -101,6 +102,13 @@ function isErrorWithMessage(err: unknown): err is { message: string } {
   );
 }
 
+interface ProjectAssignee {
+  id: string;
+  name: string;
+  role: string;
+  email: string;
+}
+
 export default function Tickets() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -125,28 +133,12 @@ export default function Tickets() {
     lng: number;
   } | null>(null);
   const [projectWorkArea, setProjectWorkArea] = useState<any>(null);
-
-  // Add dummy assignees data
-  const projectAssignees = [
-    {
-      id: 1,
-      name: "John Smith",
-      role: "Project Manager",
-      email: "john.smith@example.com",
-    },
-    {
-      id: 2,
-      name: "Sarah Johnson",
-      role: "Field Supervisor",
-      email: "sarah.j@example.com",
-    },
-    {
-      id: 3,
-      name: "Mike Wilson",
-      role: "Crew Lead",
-      email: "mike.w@example.com",
-    },
-  ];
+  const [projectAssignees, setProjectAssignees] = useState<ProjectAssignee[]>([]);
+  const [isAddAssigneeOpen, setIsAddAssigneeOpen] = useState(false);
+  const [assigneeName, setAssigneeName] = useState("");
+  const [assigneeEmail, setAssigneeEmail] = useState("");
+  const [assigneeRole, setAssigneeRole] = useState("sup");
+  const [isAddingAssignee, setIsAddingAssignee] = useState(false);
 
   useEffect(() => {
     async function fetchTickets() {
@@ -205,6 +197,65 @@ export default function Tickets() {
         .single()
         .then(({ data }) => setProjectName(data?.name || null));
     }
+  }, [searchParams]);
+
+  useEffect(() => {
+    async function fetchAssignees() {
+      const projectId = Number(searchParams.get("project"));
+      if (!projectId) return;
+
+      // Fetch project with pm_user, super (jsonb), and other_user (jsonb[])
+      const { data: project, error: projectError } = await supabase
+        .from("projects")
+        .select("pm_user, super, other_user")
+        .eq("id", projectId)
+        .single();
+
+      if (projectError || !project) {
+        setProjectAssignees([]);
+        return;
+      }
+
+      const assignees: ProjectAssignee[] = [];
+      // PM
+      if (project.pm_user) {
+        const { data: pmUser } = await supabase
+          .from("users")
+          .select("id, email, role, name")
+          .eq("id", project.pm_user)
+          .single();
+        if (pmUser) {
+          assignees.push({
+            id: pmUser.id,
+            name: pmUser.name || pmUser.email,
+            role: "Project Manager",
+            email: pmUser.email,
+          });
+        }
+      }
+      // Superintendent (from jsonb)
+      if (project.super && (project.super.name || project.super.email)) {
+        assignees.push({
+          id: "super",
+          name: project.super.name || "",
+          role: "Superintendent",
+          email: project.super.email || "",
+        });
+      }
+      // Other users (jsonb array)
+      if (Array.isArray(project.other_user)) {
+        project.other_user.forEach((other, idx) => {
+          assignees.push({
+            id: `other-${idx}`,
+            name: other.name,
+            role: "Other",
+            email: other.email,
+          });
+        });
+      }
+      setProjectAssignees(assignees);
+    }
+    fetchAssignees();
   }, [searchParams]);
 
   const handleRowClick = (ticket: Ticket) => {
@@ -505,6 +556,69 @@ export default function Tickets() {
     }
   }, [tickets]);
 
+  // Handler for adding assignee
+  async function handleAddAssignee() {
+    setIsAddingAssignee(true);
+    const projectId = Number(searchParams.get("project"));
+    if (!projectId) return;
+    try {
+      if (assigneeRole === "pm") {
+        // Upsert user and update pm_user
+        const { data: user, error: userError } = await supabase
+          .from("users")
+          .upsert({ email: assigneeEmail, name: assigneeName }, { onConflict: "email" })
+          .select()
+          .single();
+        if (userError || !user) throw userError || new Error("User upsert failed");
+        await supabase.from("projects").update({ pm_user: user.id }).eq("id", projectId);
+      } else if (assigneeRole === "sup") {
+        // Update the 'super' jsonb column with name and email
+        const { error } = await supabase.from("projects").update({
+          super: { name: assigneeName, email: assigneeEmail },
+        }).eq("id", projectId);
+        if (error) {
+          console.error("Supabase update error:", error);
+          toast({ title: "Error", description: error.message, variant: "destructive" });
+        }
+      } else if (assigneeRole === "other") {
+        // Fetch current other_user array
+        const { data: project, error: fetchError } = await supabase
+          .from("projects")
+          .select("other_user")
+          .eq("id", projectId)
+          .single();
+        if (fetchError || !project) {
+          toast({ title: "Error", description: "Could not fetch current other assignees", variant: "destructive" });
+          return;
+        }
+        const currentOthers = Array.isArray(project.other_user) ? project.other_user : [];
+        const newOthers = [
+          ...currentOthers,
+          { name: assigneeName, email: assigneeEmail }
+        ];
+        const { error: updateError } = await supabase
+          .from("projects")
+          .update({ other_user: newOthers })
+          .eq("id", projectId);
+        if (updateError) {
+          toast({ title: "Error", description: updateError.message, variant: "destructive" });
+        }
+      } else {
+        toast({ title: "Info", description: "Other assignees are not stored in the project table.", variant: "default" });
+      }
+      setIsAddAssigneeOpen(false);
+      setAssigneeName("");
+      setAssigneeEmail("");
+      setAssigneeRole("sup");
+      // Optionally, refetch assignees
+      // ...
+    } catch (err) {
+      toast({ title: "Error", description: isErrorWithMessage(err) ? err.message : "Failed to add assignee", variant: "destructive" });
+    } finally {
+      setIsAddingAssignee(false);
+    }
+  }
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -567,16 +681,10 @@ export default function Tickets() {
                 </Button>
               }
             >
-              <DropdownMenuItem onClick={() => setIsAddTicketDialogOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Ticket
+              <DropdownMenuItem onMouseDown={() => setIsAddAssigneeOpen(true)}>
+                Add Assignee
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleRefreshTickets}>
-                Refresh Tickets
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate("/unassigned-tickets")}>
-                View Unassigned Tickets
-              </DropdownMenuItem>
+              
               <DropdownMenuSeparator />
               <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -632,30 +740,25 @@ export default function Tickets() {
                         Project Assignees
                       </h4>
                       <div className="space-y-3">
-                        {projectAssignees.map((assignee) => (
-                          <div
-                            key={assignee.id}
-                            className="flex items-start space-x-3"
-                          >
-                            <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600">
-                              {assignee.name
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")}
-                            </div>
-                            <div>
-                              <div className="text-sm font-medium">
-                                {assignee.name}
+                        {projectAssignees.length === 0 ? (
+                          <div className="text-xs text-muted-foreground">No assignees found.</div>
+                        ) : (
+                          projectAssignees.map((assignee) => (
+                            <div key={assignee.id} className="flex items-start space-x-3">
+                              <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600">
+                                {assignee.name
+                                  .split(" ")
+                                  .map((n) => n[0])
+                                  .join("")}
                               </div>
-                              <div className="text-xs text-muted-foreground">
-                                {assignee.role}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                {assignee.email}
+                              <div>
+                                <div className="text-sm font-medium">{assignee.name}</div>
+                                <div className="text-xs text-muted-foreground">{assignee.role}</div>
+                                <div className="text-xs text-muted-foreground">{assignee.email}</div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          ))
+                        )}
                       </div>
                     </div>
                   </div>
@@ -753,36 +856,56 @@ export default function Tickets() {
           </CardContent>
         </Card>
 
-        <Dialog
-          open={isAddTicketDialogOpen}
-          onOpenChange={setIsAddTicketDialogOpen}
-        >
+        <Dialog open={isAddAssigneeOpen} onOpenChange={setIsAddAssigneeOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add Ticket to Project</DialogTitle>
+              <DialogTitle>Add Project Assignee</DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="ticket-number">Ticket Number</Label>
+                <Label htmlFor="assignee-name">Name</Label>
                 <Input
-                  id="ticket-number"
-                  value={newTicketNumber}
-                  onChange={(e) => setNewTicketNumber(e.target.value)}
-                  placeholder="Enter BlueStakes ticket number"
-                  disabled={isAddingTicket}
+                  id="assignee-name"
+                  value={assigneeName}
+                  onChange={(e) => setAssigneeName(e.target.value)}
+                  placeholder="Enter assignee name"
+                  disabled={isAddingAssignee}
                 />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="assignee-email">Email</Label>
+                <Input
+                  id="assignee-email"
+                  value={assigneeEmail}
+                  onChange={(e) => setAssigneeEmail(e.target.value)}
+                  placeholder="Enter assignee email"
+                  disabled={isAddingAssignee}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="assignee-role">Role</Label>
+                <select
+                  id="assignee-role"
+                  className="border rounded px-2 py-1"
+                  value={assigneeRole}
+                  onChange={(e) => setAssigneeRole(e.target.value)}
+                  disabled={isAddingAssignee}
+                >
+                  <option value="sup">Superintendent</option>
+                  <option value="other">Other</option>
+                </select>
               </div>
             </div>
             <DialogFooter>
               <Button
                 variant="outline"
-                onClick={() => setIsAddTicketDialogOpen(false)}
-                disabled={isAddingTicket}
+                onClick={() => setIsAddAssigneeOpen(false)}
+                disabled={isAddingAssignee}
               >
                 Cancel
               </Button>
-              <Button onClick={handleAddTicket} disabled={isAddingTicket}>
-                {isAddingTicket ? "Adding..." : "Add Ticket"}
+              <Button onClick={handleAddAssignee} disabled={isAddingAssignee}>
+                {isAddingAssignee ? "Adding..." : "Add Assignee"}
               </Button>
             </DialogFooter>
           </DialogContent>

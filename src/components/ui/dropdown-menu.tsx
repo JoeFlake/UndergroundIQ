@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { cn } from '@/lib/cn';
 
 interface DropdownMenuProps {
@@ -12,32 +13,53 @@ interface DropdownMenuProps {
 export function DropdownMenu({ trigger, children, align = 'right' }: DropdownMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const [menuStyles, setMenuStyles] = useState<React.CSSProperties>({});
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(event.target as Node) &&
+        triggerRef.current &&
+        !triggerRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     }
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (isOpen && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setMenuStyles({
+        position: 'fixed',
+        top: rect.bottom + 4, // 4px gap
+        left: align === 'right' ? rect.right - 224 : rect.left, // 224px = 14rem
+        zIndex: 9999,
+        minWidth: 224,
+      });
+    }
+  }, [isOpen, align]);
+
   return (
     <div className="relative" ref={menuRef}>
-      <div onClick={() => setIsOpen(!isOpen)}>
+      <div ref={triggerRef} onClick={() => setIsOpen((v) => !v)}>
         {trigger}
       </div>
-      {isOpen && (
+      {isOpen && typeof window !== 'undefined' && ReactDOM.createPortal(
         <div
+          style={menuStyles}
           className={cn(
-            "absolute z-50 mt-1 w-[14rem] rounded-md border bg-white p-1 shadow-md",
-            align === 'right' ? 'right-0' : 'left-0'
+            "rounded-md border bg-white p-1 shadow-md",
+            align === 'right' ? '' : ''
           )}
         >
           {children}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
