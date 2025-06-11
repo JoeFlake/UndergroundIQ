@@ -8,7 +8,6 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { PublicRoute } from "@/components/PublicRoute";
 import { AdminRoute } from "@/components/AdminRoute";
 import { AuthMiddleware } from "@/components/AuthMiddleware";
-import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
@@ -56,11 +55,10 @@ function App() {
 
               {/* Protected routes */}
               <Route element={<AuthMiddleware><ProtectedRoute /></AuthMiddleware>}>
-                <Route path="/" element={<Index />} />
+                <Route path="/" element={<Projects />} />
                 <Route path="/tickets" element={<Tickets />} />
                 <Route path="/tickets/:ticketId" element={<TicketView />} />
                 <Route path="/unassigned-tickets" element={<UnassignedTickets />} />
-                <Route path="/projects" element={<Projects />} />
               </Route>
 
               {/* Admin routes */}

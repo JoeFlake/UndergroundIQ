@@ -101,14 +101,14 @@ export default function Projects() {
     // Fetch projects for the company
     const { data: companyProjects, error: companyProjectsError } = await supabase
       .from("company_projects")
-      .select("project_id, projects(id, name, created_by)")
+      .select("project_id, projects(id, name, created_by, pm_user, super)")
       .eq("company_id", companyId);
     if (companyProjectsError || !companyProjects) {
       setProjects([]);
       setLoading(false);
       return;
     }
-    // Fetch ticket counts for each project
+    // Fetch ticket counts and assignee data for each project
     const projectsWithCounts = await Promise.all(
       companyProjects.map(async (row: any) => {
         const project = row.projects;
@@ -118,31 +118,29 @@ export default function Projects() {
           .eq("project_id", project.id)
           .gt("replace_by_date", new Date().toISOString());
 
-        // Dummy superintendent data - this will be replaced with real data later
-        const dummySuperintendents = [
-          "John Smith",
-          "Sarah Johnson",
-          "Michael Brown",
-          "Emily Davis",
-          "Robert Wilson"
-        ];
-        const dummyPMs = [
-          "David Anderson",
-          "Lisa Martinez",
-          "James Thompson",
-          "Rachel Green",
-          "Thomas White"
-        ];
-        const randomSuperintendent = dummySuperintendents[Math.floor(Math.random() * dummySuperintendents.length)];
-        const randomPM = dummyPMs[Math.floor(Math.random() * dummyPMs.length)];
+        // Fetch PM data if exists
+        let projectManager = null;
+        if (project.pm_user) {
+          const { data: pmUser } = await supabase
+            .from("users")
+            .select("name, email")
+            .eq("id", project.pm_user)
+            .single();
+          if (pmUser) {
+            projectManager = pmUser.name || pmUser.email;
+          }
+        }
+
+        // Get superintendent data from super jsonb
+        const superintendent = project.super?.name || project.super?.email || null;
 
         return {
           id: project.id,
           name: project.name,
           created_by: project.created_by,
           ticket_count: countError ? 0 : count || 0,
-          superintendent: randomSuperintendent,
-          project_manager: randomPM,
+          superintendent: superintendent,
+          project_manager: projectManager,
         };
       })
     );

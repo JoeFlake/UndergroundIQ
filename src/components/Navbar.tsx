@@ -45,18 +45,13 @@ export function Navbar() {
   };
 
   const isActive = (path: string) => {
-    // Home is '/' or '/tickets', Projects is '/projects'
+    // Home is '/', Projects is '/projects'
     if (
       location.pathname === "/tickets" &&
       location.search.includes("project=")
     )
       return false;
-    if (
-      path === "/" &&
-      (location.pathname === "/" ||
-        (location.pathname === "/tickets" &&
-          !location.search.includes("project=")))
-    )
+    if (path === "/" && location.pathname === "/")
       return true;
     return location.pathname.startsWith(path) && path !== "/";
   };
@@ -79,9 +74,9 @@ export function Navbar() {
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
               <button
-                onClick={() => navigate("/projects")}
+                onClick={() => navigate("/")}
                 className={`border-b-2 px-1 pt-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-gray-200 focus:ring-opacity-75 rounded-sm inline-flex items-center ${
-                  isActive("/projects")
+                  isActive("/")
                     ? "border-orange-500 text-orange-600"
                     : "border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-900"
                 }`}
@@ -127,7 +122,7 @@ export function Navbar() {
                   </Button>
                 }
               >
-                <DropdownMenuItem onClick={() => navigate("/projects")}> <HomeIcon className="h-4 w-4 mr-2" /> Home</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/")}> <HomeIcon className="h-4 w-4 mr-2" /> Home</DropdownMenuItem>
                 {isAdmin && (
                   <DropdownMenuItem onClick={() => navigate("/unassigned-tickets")}> <CheckSquare className="h-4 w-4 mr-2" /> To Do</DropdownMenuItem>
                 )}
@@ -172,7 +167,7 @@ export function Navbar() {
                   </Button>
                 }
               >
-                <DropdownMenuItem onClick={() => navigate("/projects")}> <HomeIcon className="h-4 w-4 mr-2" /> Home</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/")}> <HomeIcon className="h-4 w-4 mr-2" /> Home</DropdownMenuItem>
                 {isAdmin && (
                   <DropdownMenuItem onClick={() => navigate("/unassigned-tickets")}> <CheckSquare className="h-4 w-4 mr-2" /> To Do</DropdownMenuItem>
                 )}
