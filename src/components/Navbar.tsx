@@ -8,10 +8,12 @@ import {
   CheckSquare,
   Shield,
   Search,
+  Menu,
 } from "lucide-react";
 import logo from "../assets/images/LogoWide.png";
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "./ui/dropdown-menu";
 
 export function Navbar() {
   const navigate = useNavigate();
@@ -69,7 +71,7 @@ export function Navbar() {
 
   return (
     <nav className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="container mx-auto px-4">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <div className="flex-shrink-0">
@@ -115,6 +117,27 @@ export function Navbar() {
                 </button>
               )}
             </div>
+            {/* Hamburger menu for mobile */}
+            <div className="sm:hidden ml-2 flex items-center">
+              <DropdownMenu
+                trigger={
+                  <Button variant="ghost" size="icon" className="p-2">
+                    <Menu className="h-6 w-6" />
+                    <span className="sr-only">Open menu</span>
+                  </Button>
+                }
+              >
+                <DropdownMenuItem onClick={() => navigate("/projects")}> <HomeIcon className="h-4 w-4 mr-2" /> Home</DropdownMenuItem>
+                {isAdmin && (
+                  <DropdownMenuItem onClick={() => navigate("/unassigned-tickets")}> <CheckSquare className="h-4 w-4 mr-2" /> To Do</DropdownMenuItem>
+                )}
+                {isAdmin && (
+                  <DropdownMenuItem onClick={() => navigate("/admin")}> <Shield className="h-4 w-4 mr-2" /> Admin Panel</DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut}> <User className="h-4 w-4 mr-2" /> Sign out</DropdownMenuItem>
+              </DropdownMenu>
+            </div>
           </div>
           <div className="flex items-center space-x-4">
             <form onSubmit={handleSearch} className="flex items-center">
@@ -129,13 +152,37 @@ export function Navbar() {
                 <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               </div>
             </form>
-            <Button
-              variant="outline"
-              onClick={handleSignOut}
-              className="border-gray-200 text-gray-700 hover:bg-gray-50"
-            >
-              Sign out
-            </Button>
+            {/* Desktop sign out button */}
+            <div className="hidden sm:block">
+              <Button
+                variant="outline"
+                onClick={handleSignOut}
+                className="border-gray-200 text-gray-700 hover:bg-gray-50"
+              >
+                Sign out
+              </Button>
+            </div>
+            {/* Hamburger menu for mobile (right of search bar) */}
+            <div className="sm:hidden ml-2 flex items-center">
+              <DropdownMenu
+                trigger={
+                  <Button variant="ghost" size="icon" className="p-2">
+                    <Menu className="h-6 w-6" />
+                    <span className="sr-only">Open menu</span>
+                  </Button>
+                }
+              >
+                <DropdownMenuItem onClick={() => navigate("/projects")}> <HomeIcon className="h-4 w-4 mr-2" /> Home</DropdownMenuItem>
+                {isAdmin && (
+                  <DropdownMenuItem onClick={() => navigate("/unassigned-tickets")}> <CheckSquare className="h-4 w-4 mr-2" /> To Do</DropdownMenuItem>
+                )}
+                {isAdmin && (
+                  <DropdownMenuItem onClick={() => navigate("/admin")}> <Shield className="h-4 w-4 mr-2" /> Admin Panel</DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut}> <User className="h-4 w-4 mr-2" /> Sign out</DropdownMenuItem>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
       </div>
