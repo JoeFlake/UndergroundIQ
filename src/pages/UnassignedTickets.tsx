@@ -245,14 +245,46 @@ export default function UnassignedTickets() {
     }
 
     try {
-      // Fetch tickets needing update first
-      const updateTickets =
-        await bluestakesService.getTicketsNeedingUpdate(bluestakesToken);
+      // Fetch all tickets
+      const allTickets = await bluestakesService.getAllTickets(bluestakesToken);
 
-      // Filter out duplicates from updateTickets using a Set
+      // Fetch all ticket information from project_tickets
+      const {
+        data: projectTickets,
+        error: projectTicketsError,
+      }: { 
+        data: { 
+          ticket_number: string;
+          old_ticket: string | null;
+          is_continue_update: boolean;
+        }[] | null; 
+        error: unknown 
+      } = await supabase
+        .from("project_tickets")
+        .select("ticket_number, old_ticket, is_continue_update");
+      
+      if (projectTicketsError) throw projectTicketsError;
+
+      // Create sets for active tickets and previous tickets
+      const activeTicketNumbers = new Set(
+        (projectTickets || [])
+          .filter(ticket => ticket.is_continue_update)
+          .map(ticket => ticket.ticket_number)
+      );
+      const previousTicketNumbers = new Set(
+        (projectTickets || [])
+          .filter(ticket => ticket.old_ticket)
+          .map(ticket => ticket.old_ticket)
+      );
+
+      // Fetch tickets needing update
+      const updateTickets = await bluestakesService.getTicketsNeedingUpdate(bluestakesToken);
+      
+      // Filter out duplicates and inactive tickets
       const seenUpdateTickets = new Set<string>();
       const uniqueUpdateTickets = updateTickets.filter((ticket) => {
         if (seenUpdateTickets.has(ticket.ticket)) return false;
+        if (!activeTicketNumbers.has(ticket.ticket)) return false; // Only show tickets that should continue updates
         seenUpdateTickets.add(ticket.ticket);
         return true;
       });
@@ -271,34 +303,14 @@ export default function UnassignedTickets() {
       setTicketsNeedingUpdate(sortedUpdateTickets);
       setSessionCache("ticketsNeedingUpdate", sortedUpdateTickets);
 
-      // Then fetch unassigned tickets (your existing logic)
-      // Ensure user has company_id
-      if (user && !user.company_id && typeof setUser === "function") {
-        const companyId = await ensureUserCompanyId(user, setUser);
-        if (companyId) user.company_id = companyId;
-      }
-
-      // Fetch all tickets
-      const allTickets = await bluestakesService.getAllTickets(bluestakesToken);
-
-      // Fetch all assigned ticket numbers from project_tickets
-      const {
-        data: assigned,
-        error: assignedError,
-      }: { data: { ticket_number: string }[] | null; error: unknown } =
-        await supabase.from("project_tickets").select("ticket_number");
-      if (assignedError) throw assignedError;
-      const assignedTicketNumbers = new Set(
-        (assigned || []).map((row) => row.ticket_number)
-      );
-
-      // Filter out assigned tickets and only keep active ones
+      // Filter out active tickets, previous tickets, and only keep active ones
       const now = new Date();
       const unassignedTickets = allTickets.filter(
         (ticket) =>
-          !assignedTicketNumbers.has(ticket.ticket) &&
-          ticket.expires &&
-          new Date(ticket.expires) > now
+          !activeTicketNumbers.has(ticket.ticket) && // Not a ticket that should continue updates
+          !previousTicketNumbers.has(ticket.ticket) && // Not an old ticket
+          ticket.replace_by_date && // Has replace_by_date
+          new Date(ticket.replace_by_date) > now // Not expired based on replace_by_date
       );
 
       // For each unassigned ticket, check if it's an update of an existing ticket
@@ -311,31 +323,37 @@ export default function UnassignedTickets() {
           );
 
           if (ticketDetails.original_ticket) {
-            // Check if the original ticket is assigned to a project
-            const { data: originalAssignment, error: originalError } =
-              await supabase
-                .from("project_tickets")
-                .select("project_id")
-                .eq("ticket_number", ticketDetails.original_ticket)
-                .maybeSingle();
+            // Find the original ticket in our project tickets
+            const originalTicket = projectTickets?.find(
+              pt => pt.ticket_number === ticketDetails.original_ticket && pt.is_continue_update
+            );
 
-            if (originalError) throw originalError;
-
-            if (originalAssignment) {
-              // Update the row to use the new ticket number and replace_by_date
-              const { error: updateError } = await supabase
+            if (originalTicket) {
+              // Mark the original ticket as not continuing updates
+              const { error: deactivateError } = await supabase
                 .from("project_tickets")
-                .update({
-                  ticket_number: ticket.ticket,
-                  replace_by_date: ticketDetails.replace_by_date,
-                })
+                .update({ is_continue_update: false })
                 .eq("ticket_number", ticketDetails.original_ticket);
-              if (updateError) throw updateError;
+              
+              if (deactivateError) throw deactivateError;
+
+              // Insert the new ticket
+              const { error: insertError } = await supabase
+                .from("project_tickets")
+                .insert({
+                  ticket_number: ticket.ticket,
+                  old_ticket: ticketDetails.original_ticket,
+                  replace_by_date: ticketDetails.replace_by_date,
+                  is_continue_update: true
+                });
+
+              if (insertError) throw insertError;
               return true; // Ticket was updated/assigned
             }
           }
           return false; // No original ticket or no assignment found
         } catch (error: unknown) {
+          console.error("Error processing ticket update:", error);
           return false;
         }
       });
@@ -343,31 +361,8 @@ export default function UnassignedTickets() {
       // Wait for all ticket checks to complete
       const assignmentResults = await Promise.all(updatePromises);
 
-      // Fetch updated assigned tickets after potential updates
-      const { data: updatedAssigned, error: updatedAssignedError } =
-        await supabase.from("project_tickets").select("ticket_number");
-
-      if (updatedAssignedError) throw updatedAssignedError;
-
-      const updatedAssignedTicketNumbers = new Set(
-        (updatedAssigned || []).map((row) => row.ticket_number)
-      );
-
-      // Filter out newly assigned tickets and ensure no duplicates
-      const seenUnassignedTickets = new Set<string>();
-      const filteredTickets = unassignedTickets.filter((ticket, index) => {
-        if (seenUnassignedTickets.has(ticket.ticket)) return false;
-        if (
-          assignmentResults[index] ||
-          updatedAssignedTicketNumbers.has(ticket.ticket)
-        )
-          return false;
-        seenUnassignedTickets.add(ticket.ticket);
-        return true;
-      });
-
-      setTickets(filteredTickets);
-      setSessionCache("unassignedTickets", filteredTickets);
+      setTickets(unassignedTickets.filter((_, index) => !assignmentResults[index]));
+      setSessionCache("unassignedTickets", unassignedTickets.filter((_, index) => !assignmentResults[index]));
 
       // Fetch projects for this company
       if (user && user.company_id) {
