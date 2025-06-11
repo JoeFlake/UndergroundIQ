@@ -23,11 +23,33 @@ import { Skeleton } from "../components/ui/skeleton";
 import { Input } from "../components/ui/input";
 import { MapPin, ExternalLink, Search, Folder, Plus } from "lucide-react";
 
+interface Project {
+  id: string;
+  name: string;
+  created_by: string;
+  ticket_count: number;
+  created_at?: string;
+}
+
+interface ProjectData {
+  project_id: string;
+  projects: {
+    id: string;
+    name: string;
+    created_by: string;
+  };
+  tickets: { count: number }[];
+}
+
+interface CompanyProject {
+  projects: ProjectData;
+}
+
 export default function Projects() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-  const [projects, setProjects] = useState<any[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
@@ -68,6 +90,7 @@ export default function Projects() {
       .select("company_id")
       .eq("id", user.id)
       .single();
+    
     if (userError || !userProfile?.company_id) {
       setProjects([]);
       setLoading(false);
@@ -75,16 +98,33 @@ export default function Projects() {
     }
     const companyId = userProfile.company_id;
     // Fetch projects for the company
-    const { data, error } = await supabase
+    const { data: companyProjects, error: companyProjectsError } = await supabase
       .from("company_projects")
-      .select("projects(*)")
+      .select("project_id, projects(id, name, created_by)")
       .eq("company_id", companyId);
-    if (error) {
+    if (companyProjectsError || !companyProjects) {
       setProjects([]);
-    } else {
-      // Flatten the projects array
-      setProjects((data || []).map((row) => row.projects));
+      setLoading(false);
+      return;
     }
+    // Fetch ticket counts for each project
+    const projectsWithCounts = await Promise.all(
+      companyProjects.map(async (row: any) => {
+        const project = row.projects;
+        const { count, error: countError } = await supabase
+          .from("project_tickets")
+          .select("id", { count: "exact", head: true })
+          .eq("project_id", project.id)
+          .gt("replace_by_date", new Date().toISOString());
+        return {
+          id: project.id,
+          name: project.name,
+          created_by: project.created_by,
+          ticket_count: countError ? 0 : count || 0,
+        };
+      })
+    );
+    setProjects(projectsWithCounts);
     setLoading(false);
   }
 
@@ -101,7 +141,7 @@ export default function Projects() {
       project.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleProjectClick = (project: any) => {
+  const handleProjectClick = (project: Project) => {
     navigate(`/tickets?project=${project.id}`);
   };
 
@@ -228,61 +268,43 @@ export default function Projects() {
             />
           </div>
         </div>
-        {/* Projects table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Projects</CardTitle>
-            <CardDescription>
-              Click on a project to view its tickets
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Project Name</TableHead>
-                  <TableHead>Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredProjects.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={2}
-                      className="text-center text-gray-500 py-8"
-                    >
-                      No projects found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredProjects.map((project) => (
-                    <TableRow
-                      key={project.id}
-                      className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() => handleProjectClick(project)}
-                    >
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <MapPin className="h-4 w-4 text-gray-400" />
-                          <div>
-                            <div className="font-medium">
-                              {project.name || "Unknown Project"}
-                            </div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm">
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        {/* Projects grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredProjects.length === 0 ? (
+            <Card className="col-span-full text-center py-12">
+              <CardContent>
+                <div className="text-gray-500">No projects found</div>
+              </CardContent>
+            </Card>
+          ) : (
+            filteredProjects.map((project) => (
+              <Card
+                key={project.id}
+                className="cursor-pointer hover:shadow-lg transition"
+                onClick={() => handleProjectClick(project)}
+              >
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-5 w-5 text-orange-500" />
+                    <span className="font-bold text-lg">{project.name || "Unknown Project"}</span>
+                  </div>
+                  {project.created_at && (
+                    <div className="text-sm text-gray-500 mt-1">
+                      Created: {new Date(project.created_at).toLocaleDateString()}
+                    </div>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+                      {project.ticket_count} Tickets
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
