@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { PublicRoute } from "@/components/PublicRoute";
 import { AdminRoute } from "@/components/AdminRoute";
+import { AuthMiddleware } from "@/components/AuthMiddleware";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -38,86 +39,45 @@ function InviteRedirector() {
   return null;
 }
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <HashRouter>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <HashRouter>
         <AuthProvider>
-          <InviteRedirector />
-          <Routes>
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <Projects />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/tickets"
-              element={
-                <ProtectedRoute>
-                  <Tickets />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/projects"
-              element={
-                <ProtectedRoute>
-                  <Projects />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/tickets/:ticketId"
-              element={
-                <ProtectedRoute>
-                  <TicketView />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/login"
-              element={
-                <PublicRoute>
-                  <Login />
-                </PublicRoute>
-              }
-            />
-            <Route
-              path="/signup"
-              element={
-                <PublicRoute>
-                  <Signup />
-                </PublicRoute>
-              }
-            />
-            <Route
-              path="/admin"
-              element={
-                <AdminRoute>
-                  <AdminPanel />
-                </AdminRoute>
-              }
-            />
-            <Route
-              path="/unassigned-tickets"
-              element={
-                <ProtectedRoute>
-                  <UnassignedTickets />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="/set-password" element={<SetPassword />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <TooltipProvider>
+            <InviteRedirector />
+            <Routes>
+              {/* Public routes */}
+              <Route element={<PublicRoute />}>
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Signup />} />
+                <Route path="/set-password" element={<SetPassword />} />
+              </Route>
+
+              {/* Protected routes */}
+              <Route element={<AuthMiddleware><ProtectedRoute /></AuthMiddleware>}>
+                <Route path="/" element={<Index />} />
+                <Route path="/tickets" element={<Tickets />} />
+                <Route path="/tickets/:ticketId" element={<TicketView />} />
+                <Route path="/unassigned-tickets" element={<UnassignedTickets />} />
+                <Route path="/projects" element={<Projects />} />
+              </Route>
+
+              {/* Admin routes */}
+              <Route element={<AuthMiddleware><AdminRoute /></AuthMiddleware>}>
+                <Route path="/admin" element={<AdminPanel />} />
+              </Route>
+
+              {/* 404 route */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <Toaster />
+            <Sonner />
+          </TooltipProvider>
         </AuthProvider>
-      </TooltipProvider>
-    </HashRouter>
-  </QueryClientProvider>
-);
+      </HashRouter>
+    </QueryClientProvider>
+  );
+}
 
 export default App;

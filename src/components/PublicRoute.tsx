@@ -1,12 +1,8 @@
-import { Navigate, useLocation } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+import { Navigate, useLocation, Outlet } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { Skeleton } from "./ui/skeleton";
 
-interface PublicRouteProps {
-  children: React.ReactNode;
-}
-
-export function PublicRoute({ children }: PublicRouteProps) {
+export function PublicRoute() {
   const { user, loading } = useAuth();
   const location = useLocation();
 
@@ -19,8 +15,9 @@ export function PublicRoute({ children }: PublicRouteProps) {
   }
 
   if (user) {
-    return <Navigate to="/" state={{ from: location }} replace />;
+    // If user is already logged in, redirect to home
+    return <Navigate to="/" replace />;
   }
 
-  return <>{children}</>;
+  return <Outlet />;
 }

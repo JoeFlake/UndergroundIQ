@@ -1,14 +1,10 @@
-import { Navigate, useLocation } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+import { Navigate, useLocation, Outlet } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { Skeleton } from "./ui/skeleton";
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 
-interface AdminRouteProps {
-  children: React.ReactNode;
-}
-
-export function AdminRoute({ children }: AdminRouteProps) {
+export function AdminRoute() {
   const { user, loading } = useAuth();
   const location = useLocation();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
@@ -55,5 +51,5 @@ export function AdminRoute({ children }: AdminRouteProps) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  return <>{children}</>;
+  return <Outlet />;
 }
