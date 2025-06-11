@@ -21,7 +21,7 @@ import {
 } from "../components/ui/table";
 import { Skeleton } from "../components/ui/skeleton";
 import { Input } from "../components/ui/input";
-import { MapPin, ExternalLink, Search, Folder, Plus } from "lucide-react";
+import { MapPin, ExternalLink, Folder, Plus } from "lucide-react";
 
 interface Project {
   id: string;
@@ -29,6 +29,8 @@ interface Project {
   created_by: string;
   ticket_count: number;
   created_at?: string;
+  superintendent?: string;
+  project_manager?: string;
 }
 
 interface ProjectData {
@@ -48,7 +50,6 @@ interface CompanyProject {
 export default function Projects() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState("");
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -116,11 +117,32 @@ export default function Projects() {
           .select("id", { count: "exact", head: true })
           .eq("project_id", project.id)
           .gt("replace_by_date", new Date().toISOString());
+
+        // Dummy superintendent data - this will be replaced with real data later
+        const dummySuperintendents = [
+          "John Smith",
+          "Sarah Johnson",
+          "Michael Brown",
+          "Emily Davis",
+          "Robert Wilson"
+        ];
+        const dummyPMs = [
+          "David Anderson",
+          "Lisa Martinez",
+          "James Thompson",
+          "Rachel Green",
+          "Thomas White"
+        ];
+        const randomSuperintendent = dummySuperintendents[Math.floor(Math.random() * dummySuperintendents.length)];
+        const randomPM = dummyPMs[Math.floor(Math.random() * dummyPMs.length)];
+
         return {
           id: project.id,
           name: project.name,
           created_by: project.created_by,
           ticket_count: countError ? 0 : count || 0,
+          superintendent: randomSuperintendent,
+          project_manager: randomPM,
         };
       })
     );
@@ -136,9 +158,7 @@ export default function Projects() {
   }, [user]);
 
   const filteredProjects = projects.filter(
-    (project) =>
-      !searchQuery ||
-      project.name.toLowerCase().includes(searchQuery.toLowerCase())
+    (project) => project.ticket_count > 0
   );
 
   const handleProjectClick = (project: Project) => {
@@ -216,7 +236,7 @@ export default function Projects() {
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-              {companyName}
+              Projects for {companyName}
             </h1>
           </div>
           {userRole === "admin" && (
@@ -256,18 +276,6 @@ export default function Projects() {
             </div>
           </div>
         )}
-        {/* Search bar */}
-        <div className="mb-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search projects by name..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </div>
         {/* Projects grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProjects.length === 0 ? (
@@ -280,7 +288,7 @@ export default function Projects() {
             filteredProjects.map((project) => (
               <Card
                 key={project.id}
-                className="cursor-pointer hover:shadow-lg transition"
+                className="cursor-pointer hover:shadow-lg transition relative"
                 onClick={() => handleProjectClick(project)}
               >
                 <CardHeader>
@@ -288,17 +296,16 @@ export default function Projects() {
                     <MapPin className="h-5 w-5 text-orange-500" />
                     <span className="font-bold text-lg">{project.name || "Unknown Project"}</span>
                   </div>
-                  {project.created_at && (
-                    <div className="text-sm text-gray-500 mt-1">
-                      Created: {new Date(project.created_at).toLocaleDateString()}
-                    </div>
-                  )}
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between">
                     <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
-                      {project.ticket_count} Tickets
+                      {project.ticket_count} {project.ticket_count === 1 ? 'Ticket' : 'Tickets'}
                     </span>
+                    <div className="flex flex-col items-end gap-1 text-sm text-gray-500">
+                      <div>PM: {project.project_manager}</div>
+                      <div>Sup: {project.superintendent}</div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
