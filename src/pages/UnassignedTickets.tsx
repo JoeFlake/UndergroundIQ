@@ -24,6 +24,7 @@ import { isErrorWithMessage } from "../utils/errorHandling";
 import { 
   fetchAllTickets, 
   getProjectForTicket, 
+  getProjectsForTickets,
   markTicketNoLongerNeeded,
   handleTicketUpdate
 } from "../services/ticketService";
@@ -125,18 +126,13 @@ export default function UnassignedTickets() {
 
 
 
-  // Update useEffect to fetch project names
+  // Update useEffect to fetch project names (batched for performance)
   useEffect(() => {
     const fetchProjectNames = async () => {
       if (ticketsNeedingUpdate.length === 0) return;
 
-      const projectNames: Record<string, string> = {};
-      await Promise.all(
-        ticketsNeedingUpdate.map(async (ticket) => {
-          const projectName = await getProjectForTicket(ticket.ticket);
-          projectNames[ticket.ticket] = projectName;
-        })
-      );
+      const ticketNumbers = ticketsNeedingUpdate.map(ticket => ticket.ticket);
+      const projectNames = await getProjectsForTickets(ticketNumbers);
       setTicketProjects(projectNames);
     };
 
@@ -176,15 +172,16 @@ export default function UnassignedTickets() {
 
   const handleUpdateTicketAction = async (ticket: Ticket) => {
     try {
-      await handleTicketUpdate(ticket);
-      
-      // Show success toast
+      // Show success toast first
       toast({
         title: "Ticket Number Copied",
         description: `Ticket number ${ticket.ticket} has been copied to clipboard`,
       });
 
-      // Remove ticket from the updates list and update cache
+      // Handle the ticket update (copy to clipboard, wait 750ms, then open new tab)
+      await handleTicketUpdate(ticket);
+
+      // Remove ticket from the updates list and update cache after navigation
       const updatedTickets = ticketsNeedingUpdate.filter(t => t.ticket !== ticket.ticket);
       setTicketsNeedingUpdate(updatedTickets);
       setSessionCache("ticketsNeedingUpdate", updatedTickets);

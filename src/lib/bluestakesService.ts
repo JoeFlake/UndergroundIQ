@@ -166,7 +166,7 @@ export interface TicketSecondaryFunction {
   update: boolean;
 }
 
-const BASE_URL = "https://newtiny-api.bluestakes.org/api";
+const BASE_URL = "https://newtin-api.bluestakes.org/api";
 
 function getLatestRevisions(tickets: BlueStakesTicket[]): BlueStakesTicket[] {
   return tickets.reduce((acc, ticket) => {

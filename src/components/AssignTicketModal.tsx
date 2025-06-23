@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "./ui/button";
+import { Input } from "./ui/input";
 import { supabase } from "../lib/supabaseClient";
 import { bluestakesService, type BlueStakesTicket } from "../lib/bluestakesService";
 import type { Project } from "../types";
@@ -24,12 +25,63 @@ export function AssignTicketModal({
   bluestakesToken,
 }: AssignTicketModalProps) {
   const [selectedProject, setSelectedProject] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState("");
   const [assignSuccess, setAssignSuccess] = useState("");
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
+  
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Filter projects based on search term
+  const filteredProjects = projects.filter(project =>
+    project.project_name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(event.target as Node)
+      ) {
+        setShowDropdown(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   if (!ticket) return null;
+
+  const handleInputChange = (value: string) => {
+    setSearchTerm(value);
+    setShowDropdown(true);
+    // Clear selected project if search term doesn't match
+    const exactMatch = projects.find(p => p.project_name === value);
+    if (exactMatch) {
+      setSelectedProject(exactMatch.project_id.toString());
+    } else {
+      setSelectedProject("");
+    }
+  };
+
+  const handleProjectSelect = (project: Project) => {
+    setSearchTerm(project.project_name);
+    setSelectedProject(project.project_id.toString());
+    setShowDropdown(false);
+  };
+
+  const handleInputFocus = () => {
+    setShowDropdown(true);
+  };
 
   const handleAssign = async () => {
     if (!selectedProject) {
@@ -77,7 +129,9 @@ export function AssignTicketModal({
   const handleProjectCreated = (newProject: Project) => {
     const updatedProjects = [...projects, newProject];
     onProjectsUpdated(updatedProjects);
+    setSearchTerm(newProject.project_name);
     setSelectedProject(newProject.project_id.toString());
+    setShowDropdown(false);
   };
 
   return (
@@ -89,22 +143,44 @@ export function AssignTicketModal({
           </h2>
           <div className="mb-4">
             <div className="flex gap-2 mb-2">
-              <select
-                className="flex-1 border rounded p-2"
-                value={selectedProject}
-                onChange={(e) => setSelectedProject(e.target.value)}
-                disabled={assigning}
-              >
-                <option value="">-- Select a project --</option>
-                {projects.map((project) => (
-                  <option
-                    key={project.project_id}
-                    value={project.project_id}
+              <div className="flex-1 relative">
+                <Input
+                  ref={inputRef}
+                  type="text"
+                  placeholder="Search or select a project..."
+                  value={searchTerm}
+                  onChange={(e) => handleInputChange(e.target.value)}
+                  onFocus={handleInputFocus}
+                  disabled={assigning}
+                  className="w-full"
+                />
+                {showDropdown && filteredProjects.length > 0 && (
+                  <div
+                    ref={dropdownRef}
+                    className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-md shadow-lg z-10 max-h-48 overflow-y-auto"
                   >
-                    {project.project_name}
-                  </option>
-                ))}
-              </select>
+                    {filteredProjects.map((project) => (
+                      <div
+                        key={project.project_id}
+                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                        onClick={() => handleProjectSelect(project)}
+                      >
+                        {project.project_name}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {showDropdown && filteredProjects.length === 0 && searchTerm && (
+                  <div
+                    ref={dropdownRef}
+                    className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-md shadow-lg z-10"
+                  >
+                    <div className="px-3 py-2 text-gray-500">
+                      No projects found
+                    </div>
+                  </div>
+                )}
+              </div>
               <Button
                 variant="outline"
                 onClick={() => setIsNewProjectModalOpen(true)}

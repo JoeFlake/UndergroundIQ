@@ -18,6 +18,45 @@ export async function getProjectForTicket(ticketNumber: string): Promise<string>
   }
 }
 
+// Function to get project names for multiple tickets in a single query (performance optimized)
+export async function getProjectsForTickets(ticketNumbers: string[]): Promise<Record<string, string>> {
+  if (ticketNumbers.length === 0) return {};
+
+  try {
+    const { data, error } = await supabase
+      .from("project_tickets")
+      .select("ticket_number, projects(name)")
+      .in("ticket_number", ticketNumbers);
+
+    if (error) throw error;
+
+    const projectNames: Record<string, string> = {};
+    
+    // Initialize all tickets as "Unassigned"
+    ticketNumbers.forEach(ticketNumber => {
+      projectNames[ticketNumber] = "Unassigned";
+    });
+
+    // Update with actual project names where available
+    (data || []).forEach(item => {
+      const project = Array.isArray(item.projects) ? item.projects[0] : item.projects;
+      if (project?.name) {
+        projectNames[item.ticket_number] = project.name;
+      }
+    });
+
+    return projectNames;
+  } catch (error: unknown) {
+    console.error("Error fetching project names:", error);
+    // Return default "Unassigned" for all tickets on error
+    const projectNames: Record<string, string> = {};
+    ticketNumbers.forEach(ticketNumber => {
+      projectNames[ticketNumber] = "Unassigned";
+    });
+    return projectNames;
+  }
+}
+
 // Function to fetch all tickets and handle assignments
 export async function fetchAllTickets(bluestakesToken: string) {
   // Fetch all tickets
@@ -40,12 +79,18 @@ export async function fetchAllTickets(bluestakesToken: string) {
   
   if (projectTicketsError) throw projectTicketsError;
 
-  // Create sets for active tickets and previous tickets
+  // Create sets for ALL assigned tickets and previous tickets
+  const allAssignedTicketNumbers = new Set(
+    (projectTickets || []).map(ticket => ticket.ticket_number)
+  );
+  
+  // Keep active tickets set for the updates functionality
   const activeTicketNumbers = new Set(
     (projectTickets || [])
       .filter(ticket => ticket.is_continue_update)
       .map(ticket => ticket.ticket_number)
   );
+  
   const previousTicketNumbers = new Set(
     (projectTickets || [])
       .filter(ticket => ticket.old_ticket)
@@ -71,11 +116,11 @@ export async function fetchAllTickets(bluestakesToken: string) {
     return dateA - dateB;
   });
 
-  // Filter out active tickets, previous tickets, and only keep active ones
+  // Filter out ALL assigned tickets, previous tickets, and expired tickets
   const now = new Date();
   const unassignedTickets = allTickets.filter(
     (ticket) =>
-      !activeTicketNumbers.has(ticket.ticket) &&
+      !allAssignedTicketNumbers.has(ticket.ticket) &&
       !previousTicketNumbers.has(ticket.ticket) &&
       ticket.replace_by_date &&
       new Date(ticket.replace_by_date) > now
