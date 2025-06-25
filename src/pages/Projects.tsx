@@ -116,7 +116,7 @@ export default function Projects() {
           .from("project_tickets")
           .select("id", { count: "exact", head: true })
           .eq("project_id", project.id)
-          .gt("replace_by_date", new Date().toISOString());
+          .eq("is_continue_update", true);
 
         // Fetch PM data if exists
         let projectManager = null;
