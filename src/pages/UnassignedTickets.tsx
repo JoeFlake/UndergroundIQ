@@ -20,6 +20,7 @@ import { TicketsToUpdate } from "../components/TicketsToUpdate";
 import { UnassignedTicketsTable } from "../components/UnassignedTicketsTable";
 import { AssignTicketModal } from "../components/AssignTicketModal";
 import { ConfirmRemoveDialog } from "../components/ConfirmRemoveDialog";
+import { TicketRequestCard } from "../components/TicketRequestCard";
 import { getSessionCache, setSessionCache } from "../utils/sessionStorage";
 import { isErrorWithMessage } from "../utils/errorHandling";
 import { 
@@ -66,6 +67,7 @@ export default function UnassignedTickets() {
   const [openPopoverTicket, setOpenPopoverTicket] = useState<string | null>(null);
   const [popoverTicketData, setPopoverTicketData] = useState<Record<string, any>>({});
   const [confirmRemoveTicket, setConfirmRemoveTicket] = useState<Ticket | null>(null);
+  const [userRole, setUserRole] = useState<string>("");
 
   const openBluestakesWindow = useWindowReference("bluestakes_ticket_entry");
 
@@ -73,6 +75,29 @@ export default function UnassignedTickets() {
   const [ticketProjects, setTicketProjects] = useState<Record<string, string>>(
     {}
   );
+
+  // Fetch user role
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      if (!user) return;
+
+      try {
+        const { data: userData, error: userError } = await supabase
+          .from("users")
+          .select("role")
+          .eq("id", user.id)
+          .single();
+
+        if (userData?.role) {
+          setUserRole(userData.role);
+        }
+      } catch (error) {
+        console.error("Error fetching user role:", error);
+      }
+    };
+
+    fetchUserRole();
+  }, [user]);
 
   // Combine tickets whenever either tickets or orphanedTickets change
   useEffect(() => {
@@ -373,6 +398,7 @@ export default function UnassignedTickets() {
             />
           </CardContent>
         </Card>
+        <TicketRequestCard userRole={userRole} />
         <Card>
           <CardHeader>
             <CardTitle>Unassigned Tickets</CardTitle>

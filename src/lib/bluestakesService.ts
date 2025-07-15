@@ -509,4 +509,49 @@ export const bluestakesService = {
     }
     return loginData.Authorization.replace("Bearer ", "");
   },
+
+  async getWorkTypes(token: string): Promise<any[]> {
+    // Define fallback work types
+    const fallbackWorkTypes = [
+      "Underground Utility Installation",
+      "Excavation", 
+      "Boring",
+      "Trenching",
+      "Road Work",
+      "Foundation Work",
+      "Landscaping",
+      "Emergency Repair"
+    ];
+
+    try {
+      const authHeader = token.startsWith("Bearer ") ? token : "Bearer " + token;
+      const response = await fetch(`${BASE_URL}/values/work-types`, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: authHeader,
+        },
+      });
+
+      if (!response.ok) {
+        console.warn("BlueStakes work types API not available, using fallback values");
+        return fallbackWorkTypes;
+      }
+
+      const workTypes = await response.json();
+      
+      // Validate the response
+      if (Array.isArray(workTypes) && workTypes.length > 0) {
+        // Return the raw API response - could be strings or objects
+        return workTypes;
+      } else {
+        console.warn("BlueStakes work types API returned invalid data, using fallback values");
+        return fallbackWorkTypes;
+      }
+    } catch (error) {
+      console.warn("BlueStakes work types API not available, using fallback values:", error?.message || error);
+      // Always return fallback work types if API fails
+      return fallbackWorkTypes;
+    }
+  },
 };
