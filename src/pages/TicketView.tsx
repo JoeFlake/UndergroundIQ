@@ -344,6 +344,16 @@ const TicketView = () => {
                   <h3 className="text-3xl font-medium mb-2 text-gray-600">
                     General Info
                   </h3>
+                  <div className="space-y-1">
+                    <div>
+                      <span className="font-semibold">Previous Ticket:</span>{" "}
+                      {currentTicket.original_ticket
+                        ? currentTicket.original_ticket === currentTicket.ticket
+                          ? "Original Ticket"
+                          : currentTicket.original_ticket
+                        : "-"}
+                    </div>
+                  </div>
                 </section>
                 <section>
                   <h3 className="text-xl font-medium mb-2">Dates</h3>

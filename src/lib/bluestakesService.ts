@@ -355,6 +355,20 @@ export const bluestakesService = {
       const sevenDaysFromNow = new Date();
       sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
 
+      // Calculate yesterday's date to include tickets due in the past day
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      // Calculate today's date for comparison
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Start of today
+
+      console.log("Debug: Date ranges", {
+        yesterday: yesterday.toISOString(),
+        today: today.toISOString(),
+        sevenDaysFromNow: sevenDaysFromNow.toISOString()
+      });
+
       // Fetch ticket details for all assigned tickets
       const ticketDetails = await Promise.all(
         assignedTickets.map(async ({ ticket_number }) => {
@@ -371,23 +385,71 @@ export const bluestakesService = {
         })
       );
 
-      // Filter tickets that are within 7 days of their replace_by_date
+      // Filter tickets that are within 7 days future or 1 day past of their replace_by_date
       const ticketsToCheck = ticketDetails.filter(
         (ticket): ticket is BlueStakesTicket => {
           if (!ticket?.replace_by_date) return false;
           const replaceDate = new Date(ticket.replace_by_date);
-          return replaceDate <= sevenDaysFromNow && replaceDate >= new Date();
+          const inRange = replaceDate <= sevenDaysFromNow && replaceDate >= yesterday;
+          
+          if (replaceDate >= yesterday && replaceDate <= sevenDaysFromNow) {
+            console.log("Debug: Ticket in date range", {
+              ticket: ticket.ticket,
+              replaceDate: replaceDate.toISOString(),
+              isPastDue: replaceDate < today
+            });
+          }
+          
+          return inRange;
         }
       );
 
-      // Check secondary functions for filtered tickets
-      const ticketsNeedingUpdate = await Promise.all(
-        ticketsToCheck.map(async (ticket) => {
+      console.log("Debug: Total tickets to check", ticketsToCheck.length);
+
+      // Separate past due and today tickets from future tickets
+      const pastDueAndTodayTickets: BlueStakesTicket[] = [];
+      const futureTickets: BlueStakesTicket[] = [];
+
+      ticketsToCheck.forEach(ticket => {
+        const replaceDate = new Date(ticket.replace_by_date);
+        const replaceDateNoTime = new Date(replaceDate);
+        replaceDateNoTime.setHours(0, 0, 0, 0); // Normalize to start of day
+        
+        console.log("Debug: Comparing dates for ticket", ticket.ticket, {
+          originalReplaceDate: ticket.replace_by_date,
+          parsedReplaceDate: replaceDate.toISOString(),
+          normalizedReplaceDate: replaceDateNoTime.toISOString(),
+          today: today.toISOString(),
+          isPastDue: replaceDateNoTime < today,
+          isToday: replaceDateNoTime.getTime() === today.getTime()
+        });
+        
+        if (replaceDateNoTime <= today) {
+          // Ticket is past due (yesterday) or due today - include automatically
+          console.log("Debug: Adding past due or today ticket", ticket.ticket, replaceDateNoTime.toISOString());
+          pastDueAndTodayTickets.push(ticket);
+        } else {
+          // Ticket is future (tomorrow+) - check secondary functions
+          futureTickets.push(ticket);
+        }
+      });
+
+      console.log("Debug: Past due and today tickets found", pastDueAndTodayTickets.length);
+      console.log("Debug: Future tickets found", futureTickets.length);
+
+      // Check secondary functions only for future tickets (tomorrow and beyond)
+      const futureTicketsNeedingUpdate = await Promise.all(
+        futureTickets.map(async (ticket) => {
           try {
             const secondaryFunction = await this.getTicketSecondaryFunction(
               ticket.ticket,
               token
             );
+            console.log("Debug: Secondary function check for ticket", ticket.ticket, {
+              replaceDate: ticket.replace_by_date,
+              updateFlag: secondaryFunction.update,
+              included: secondaryFunction.update ? "YES" : "NO"
+            });
             return secondaryFunction.update ? ticket : null;
           } catch (error) {
             console.error(
@@ -399,10 +461,17 @@ export const bluestakesService = {
         })
       );
 
-      // Filter out null values (tickets that don't need updates or had errors)
-      return ticketsNeedingUpdate.filter(
-        (ticket): ticket is BlueStakesTicket => ticket !== null
-      );
+      // Combine past due/today tickets (automatically included) with future tickets that need updates
+      const allTicketsNeedingUpdate = [
+        ...pastDueAndTodayTickets,
+        ...futureTicketsNeedingUpdate.filter(
+          (ticket): ticket is BlueStakesTicket => ticket !== null
+        )
+      ];
+
+      console.log("Debug: Final tickets needing update", allTicketsNeedingUpdate.length);
+
+      return allTicketsNeedingUpdate;
     } catch (error) {
       console.error("Error fetching tickets needing update:", error);
       throw error;

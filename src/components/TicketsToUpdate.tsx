@@ -41,6 +41,17 @@ export function TicketsToUpdate({
 }: TicketsToUpdateProps) {
   const [openDropdownTicket, setOpenDropdownTicket] = useState<string | null>(null);
 
+  // Helper function to check if a ticket is overdue
+  const isTicketOverdue = (ticket: BlueStakesTicket): boolean => {
+    if (!ticket.replace_by_date) return false;
+    const today = new Date();
+    const replaceByDate = new Date(ticket.replace_by_date);
+    // Set time to start of day for accurate comparison
+    today.setHours(0, 0, 0, 0);
+    replaceByDate.setHours(0, 0, 0, 0);
+    return replaceByDate < today;
+  };
+
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside() {
@@ -84,26 +95,30 @@ export function TicketsToUpdate({
             </TableCell>
           </TableRow>
         ) : (
-          tickets.map((ticket, index) => (
-            <TicketRowPopover
-              key={`update-${ticket.ticket}-${index}`}
-              ticketNumber={ticket.ticket}
-              bluestakesToken={bluestakesToken}
-              openPopoverTicket={openPopoverTicket}
-              onOpenChange={onOpenPopoverTicket}
-              popoverTicketData={popoverTicketData}
-              onTicketDataLoaded={onPopoverTicketDataUpdate}
-            >
-              <TableRow className="cursor-pointer">
-                <TableCell>{ticket.ticket}</TableCell>
-                <TableCell>
-                  {ticketProjects[ticket.ticket] || (
-                    <span className="text-gray-400">Loading...</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {formatDate(ticket.replace_by_date).split(",")[0]}
-                </TableCell>
+          tickets.map((ticket, index) => {
+            const isOverdue = isTicketOverdue(ticket);
+            const textColorClass = isOverdue ? "text-red-600" : "";
+            
+            return (
+              <TicketRowPopover
+                key={`update-${ticket.ticket}-${index}`}
+                ticketNumber={ticket.ticket}
+                bluestakesToken={bluestakesToken}
+                openPopoverTicket={openPopoverTicket}
+                onOpenChange={onOpenPopoverTicket}
+                popoverTicketData={popoverTicketData}
+                onTicketDataLoaded={onPopoverTicketDataUpdate}
+              >
+                <TableRow className="cursor-pointer">
+                  <TableCell className={textColorClass}>{ticket.ticket}</TableCell>
+                  <TableCell className={textColorClass}>
+                    {ticketProjects[ticket.ticket] || (
+                      <span className="text-gray-400">Loading...</span>
+                    )}
+                  </TableCell>
+                  <TableCell className={textColorClass}>
+                    {formatDate(ticket.replace_by_date).split(",")[0]}
+                  </TableCell>
                 <TableCell className="w-40 flex justify-center items-center gap-1">
                   <Button
                     size="sm"
@@ -149,7 +164,8 @@ export function TicketsToUpdate({
                 </TableCell>
               </TableRow>
             </TicketRowPopover>
-          ))
+              );
+            })
         )}
       </TableBody>
     </Table>

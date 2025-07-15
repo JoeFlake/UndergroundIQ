@@ -38,16 +38,38 @@ export function NewProjectModal({ open, onOpenChange, onProjectCreated }: NewPro
 
     setCreating(true);
     try {
-      // Insert new project
+      // Get user's company_id first
+      const { data: userProfile, error: userError } = await supabase
+        .from("users")
+        .select("company_id")
+        .eq("id", user.id)
+        .single();
+
+      if (userError || !userProfile?.company_id) {
+        throw new Error("Could not determine company");
+      }
+
+      const companyId = userProfile.company_id;
+
+      // Insert new project with created_by field
       const { data: newProject, error: projectError } = await supabase
         .from("projects")
-        .insert([{ name: projectName.trim() }])
+        .insert([{ name: projectName.trim(), created_by: user.id }])
         .select()
         .single();
 
       if (projectError) throw projectError;
 
-      // Add user to project
+      // Link the project to the company via company_projects table
+      const { error: companyProjectError } = await supabase
+        .from("company_projects")
+        .insert([{ company_id: companyId, project_id: newProject.id }]);
+
+      if (companyProjectError) {
+        throw new Error("Project created, but failed to link to company.");
+      }
+
+      // Add user to project via user_projects table
       const { error: userProjectError } = await supabase
         .from("user_projects")
         .insert([
@@ -57,7 +79,10 @@ export function NewProjectModal({ open, onOpenChange, onProjectCreated }: NewPro
           },
         ]);
 
-      if (userProjectError) throw userProjectError;
+      if (userProjectError) {
+        // This is not critical, so we'll just log it but still consider the project creation successful
+        console.warn("Failed to add user to project:", userProjectError);
+      }
 
       // Call callback with new project
       onProjectCreated({

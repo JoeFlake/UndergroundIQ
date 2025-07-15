@@ -12,8 +12,30 @@ import { TicketRowPopover } from "./TicketRowPopover";
 import { formatStreetAddress } from "../utils/ticketFormatters";
 import type { BlueStakesTicket } from "../lib/bluestakesService";
 
+// Combined ticket type for unassigned tickets
+type UnassignedTicket = BlueStakesTicket | {
+  ticket_number: string;
+  replace_by_date?: string;
+  bluestakes_data?: BlueStakesTicket;
+};
+
+// Type guard to check if ticket is a BlueStakesTicket
+function isBlueStakesTicket(ticket: UnassignedTicket): ticket is BlueStakesTicket {
+  return 'ticket' in ticket && typeof ticket.ticket === 'string';
+}
+
+// Helper to get ticket number from either type
+function getTicketNumber(ticket: UnassignedTicket): string {
+  return isBlueStakesTicket(ticket) ? ticket.ticket : ticket.ticket_number;
+}
+
+// Helper to get BlueStakes data from either type
+function getBlueStakesData(ticket: UnassignedTicket): BlueStakesTicket | undefined {
+  return isBlueStakesTicket(ticket) ? ticket : ticket.bluestakes_data;
+}
+
 interface UnassignedTicketsTableProps {
-  tickets: BlueStakesTicket[];
+  tickets: UnassignedTicket[];
   loading: boolean;
   openPopoverTicket: string | null;
   onOpenPopoverTicket: (ticketNumber: string | null) => void;
@@ -65,37 +87,47 @@ export function UnassignedTicketsTable({
             </TableCell>
           </TableRow>
         ) : (
-          tickets.map((ticket, index) => (
-            <TicketRowPopover
-              key={`unassigned-${ticket.ticket}-${index}`}
-              ticketNumber={ticket.ticket}
-              bluestakesToken={bluestakesToken}
-              openPopoverTicket={openPopoverTicket}
-              onOpenChange={onOpenPopoverTicket}
-              popoverTicketData={popoverTicketData}
-              onTicketDataLoaded={onPopoverTicketDataUpdate}
-            >
-              <TableRow className="cursor-pointer">
-                <TableCell>{ticket.ticket}</TableCell>
-                <TableCell>{ticket.contact}</TableCell>
-                <TableCell>{ticket.done_for}</TableCell>
-                <TableCell>
-                  {formatStreetAddress(ticket)}
-                </TableCell>
-                <TableCell className="w-40 flex justify-center">
-                  <Button
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onAssignTicket(ticket);
-                    }}
-                  >
-                    Assign to Project
-                  </Button>
-                </TableCell>
-              </TableRow>
-            </TicketRowPopover>
-          ))
+          tickets.map((ticket, index) => {
+            const ticketNumber = getTicketNumber(ticket);
+            const blueStakesData = getBlueStakesData(ticket);
+            const hasBlueStakesData = !!blueStakesData;
+            
+            return (
+              <TicketRowPopover
+                key={`unassigned-${ticketNumber}-${index}`}
+                ticketNumber={ticketNumber}
+                bluestakesToken={bluestakesToken}
+                openPopoverTicket={openPopoverTicket}
+                onOpenChange={onOpenPopoverTicket}
+                popoverTicketData={popoverTicketData}
+                onTicketDataLoaded={onPopoverTicketDataUpdate}
+              >
+                <TableRow className="cursor-pointer">
+                  <TableCell className="font-mono text-sm">{ticketNumber}</TableCell>
+                  <TableCell>{hasBlueStakesData ? blueStakesData.contact : '-'}</TableCell>
+                  <TableCell>{hasBlueStakesData ? blueStakesData.done_for : '-'}</TableCell>
+                  <TableCell>
+                    {hasBlueStakesData ? formatStreetAddress(blueStakesData) : '-'}
+                  </TableCell>
+                  <TableCell className="w-40 flex justify-center">
+                    <Button
+                      size="sm"
+                      disabled={!hasBlueStakesData}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (blueStakesData) {
+                          onAssignTicket(blueStakesData);
+                        }
+                      }}
+                      title={!hasBlueStakesData ? "BlueStakes data required to assign ticket" : ""}
+                    >
+                      {hasBlueStakesData ? 'Assign to Project' : 'No Data'}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              </TicketRowPopover>
+            );
+          })
         )}
       </TableBody>
     </Table>

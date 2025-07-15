@@ -4,6 +4,7 @@ import { Navbar } from "../components/Navbar";
 import { useBluestakesAuth } from "../hooks/useBluestakesAuth";
 import { useWindowReference } from "../hooks/useWindowReference";
 import type { BlueStakesTicket } from "../lib/bluestakesService";
+import { bluestakesService } from "../lib/bluestakesService";
 import {
   Card,
   CardContent,
@@ -26,11 +27,21 @@ import {
   getProjectForTicket, 
   getProjectsForTickets,
   markTicketNoLongerNeeded,
-  handleTicketUpdate
+  fetchOrphanedTickets
 } from "../services/ticketService";
 
 // Type alias for backward compatibility
 type Ticket = BlueStakesTicket;
+
+// Interface for database tickets that may not have full BlueStakes data
+interface DatabaseTicket {
+  ticket_number: string;
+  replace_by_date?: string;
+  bluestakes_data?: BlueStakesTicket;
+}
+
+// Combined ticket type for display
+type UnassignedTicket = BlueStakesTicket | DatabaseTicket;
 
 export default function UnassignedTickets() {
   const { toast } = useToast();
@@ -41,11 +52,14 @@ export default function UnassignedTickets() {
     error: authError,
   } = useBluestakesAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [orphanedTickets, setOrphanedTickets] = useState<DatabaseTicket[]>([]);
+  const [combinedTickets, setCombinedTickets] = useState<UnassignedTicket[]>([]);
   const [ticketsNeedingUpdate, setTicketsNeedingUpdate] = useState<Ticket[]>(
     []
   );
   const [loading, setLoading] = useState(true);
   const [loadingUpdates, setLoadingUpdates] = useState(true);
+  const [loadingOrphaned, setLoadingOrphaned] = useState(true);
   const [error, setError] = useState<string>("");
   const [projects, setProjects] = useState<Project[]>([]);
   const [assigningTicket, setAssigningTicket] = useState<Ticket | null>(null);
@@ -55,12 +69,83 @@ export default function UnassignedTickets() {
 
   const openBluestakesWindow = useWindowReference("bluestakes_ticket_entry");
 
-
-
   // Add state for project names
   const [ticketProjects, setTicketProjects] = useState<Record<string, string>>(
     {}
   );
+
+  // Combine tickets whenever either tickets or orphanedTickets change
+  useEffect(() => {
+    // Helper function to get ticket number from either type
+    const getTicketNumber = (ticket: UnassignedTicket): string => {
+      return 'ticket' in ticket ? ticket.ticket : ticket.ticket_number;
+    };
+
+    // Filter tickets to only show those beginning with "A" or "C"
+    const filteredTickets = tickets.filter(ticket => {
+      const ticketNumber = getTicketNumber(ticket);
+      return ticketNumber.toUpperCase().startsWith('A') || ticketNumber.toUpperCase().startsWith('C');
+    });
+
+    const filteredOrphanedTickets = orphanedTickets.filter(ticket => {
+      const ticketNumber = getTicketNumber(ticket);
+      return ticketNumber.toUpperCase().startsWith('A') || ticketNumber.toUpperCase().startsWith('C');
+    });
+
+    const combined: UnassignedTicket[] = [...filteredTickets, ...filteredOrphanedTickets];
+    setCombinedTickets(combined);
+  }, [tickets, orphanedTickets]);
+
+  // Fetch orphaned tickets with null project_id
+  async function fetchOrphanedTicketsData() {
+    setLoadingOrphaned(true);
+    
+    // Try to load from sessionStorage first
+    const cachedOrphaned = getSessionCache("orphanedTickets");
+    if (cachedOrphaned) {
+      setOrphanedTickets(cachedOrphaned);
+      setLoadingOrphaned(false);
+      return;
+    }
+
+    try {
+      const orphanedData = await fetchOrphanedTickets();
+      
+      // Enrich with BlueStakes data if token is available
+      const enrichedOrphaned: DatabaseTicket[] = [];
+      if (orphanedData.length > 0) {
+        for (const orphaned of orphanedData) {
+          const dbTicket: DatabaseTicket = {
+            ticket_number: orphaned.ticket_number,
+            replace_by_date: orphaned.replace_by_date,
+          };
+
+          // Try to get BlueStakes data if token is available
+          if (bluestakesToken) {
+            try {
+              const ticketDetails = await bluestakesService.getTicketByNumber(
+                orphaned.ticket_number,
+                bluestakesToken
+              );
+              dbTicket.bluestakes_data = ticketDetails;
+            } catch (error) {
+              // BlueStakes data not available, keep just the database info
+              console.log(`Could not fetch BlueStakes data for ticket ${orphaned.ticket_number}`);
+            }
+          }
+          
+          enrichedOrphaned.push(dbTicket);
+        }
+      }
+      
+      setOrphanedTickets(enrichedOrphaned);
+      setSessionCache("orphanedTickets", enrichedOrphaned);
+    } catch (error) {
+      console.error("Error fetching orphaned tickets:", error);
+    } finally {
+      setLoadingOrphaned(false);
+    }
+  }
 
   // Fetch all tickets and tickets needing update, with sessionStorage caching
   async function fetchAll() {
@@ -78,6 +163,9 @@ export default function UnassignedTickets() {
       setTickets(cachedUnassigned);
       setLoading(false);
       setLoadingUpdates(false);
+      
+      // Still fetch orphaned tickets
+      fetchOrphanedTicketsData();
       return;
     }
 
@@ -89,20 +177,23 @@ export default function UnassignedTickets() {
       setSessionCache("ticketsNeedingUpdate", ticketsNeedingUpdate);
       setSessionCache("unassignedTickets", unassignedTickets);
 
+      // Fetch orphaned tickets
+      fetchOrphanedTicketsData();
+
       // Fetch projects for this company
       if (user && user.company_id) {
         const { data: companyProjects, error: companyProjectsError } =
           await supabase
-            .from("projects")
-            .select("id, name")
+            .from("company_projects")
+            .select("project_id, projects(id, name)")
             .eq("company_id", user.company_id);
 
         if (companyProjectsError) {
           console.error("Error fetching projects:", companyProjectsError);
         } else {
-          const projectsList = (companyProjects || []).map((row) => ({
-            project_id: row.id,
-            project_name: row.name,
+          const projectsList = (companyProjects || []).map((row: any) => ({
+            project_id: row.projects.id,
+            project_name: row.projects.name,
           }));
 
           setProjects(projectsList);
@@ -123,8 +214,6 @@ export default function UnassignedTickets() {
   useEffect(() => {
     if (user && bluestakesToken) fetchAll();
   }, [user, bluestakesToken]);
-
-
 
   // Update useEffect to fetch project names (batched for performance)
   useEffect(() => {
@@ -147,14 +236,14 @@ export default function UnassignedTickets() {
       try {
         const { data: companyProjects, error: companyProjectsError } =
           await supabase
-            .from("projects")
-            .select("id, name")
+            .from("company_projects")
+            .select("project_id, projects(id, name)")
             .eq("company_id", user.company_id);
 
         if (!companyProjectsError) {
-          const projectsList = (companyProjects || []).map((row) => ({
-            project_id: row.id,
-            project_name: row.name,
+          const projectsList = (companyProjects || []).map((row: any) => ({
+            project_id: row.projects.id,
+            project_name: row.projects.name,
           }));
           setProjects(projectsList);
         }
@@ -168,18 +257,22 @@ export default function UnassignedTickets() {
     setAssigningTicket(null);
   };
 
-
-
   const handleUpdateTicketAction = async (ticket: Ticket) => {
     try {
-      // Show success toast first
+      // Copy ticket number to clipboard
+      await navigator.clipboard.writeText(ticket.ticket);
+      
+      // Show success toast
       toast({
         title: "Ticket Number Copied",
         description: `Ticket number ${ticket.ticket} has been copied to clipboard`,
       });
 
-      // Handle the ticket update (copy to clipboard, wait 750ms, then open new tab)
-      await handleTicketUpdate(ticket);
+      // Wait 750ms for UI feedback, then open/focus tab using the hook
+      setTimeout(() => {
+        const ticketUrl = `https://newtin.bluestakes.org/newtinweb/UTAH_ticketentry.html`;
+        openBluestakesWindow(ticketUrl);
+      }, 750);
 
       // Remove ticket from the updates list and update cache after navigation
       const updatedTickets = ticketsNeedingUpdate.filter(t => t.ticket !== ticket.ticket);
@@ -218,15 +311,12 @@ export default function UnassignedTickets() {
     }
   };
 
-
-
   const handleManualRefresh = () => {
     sessionStorage.removeItem("ticketsNeedingUpdate");
     sessionStorage.removeItem("unassignedTickets");
+    sessionStorage.removeItem("orphanedTickets");
     fetchAll();
   };
-
-
 
   if (authLoading) {
     return (
@@ -289,8 +379,8 @@ export default function UnassignedTickets() {
           </CardHeader>
           <CardContent>
             <UnassignedTicketsTable
-              tickets={tickets}
-              loading={loading}
+              tickets={combinedTickets}
+              loading={loading || loadingOrphaned}
               openPopoverTicket={openPopoverTicket}
               onOpenPopoverTicket={setOpenPopoverTicket}
               popoverTicketData={popoverTicketData}
@@ -307,7 +397,10 @@ export default function UnassignedTickets() {
           projects={projects}
           onClose={closeAssignModal}
           onTicketAssigned={(ticketNumber) => {
+            // Remove from regular unassigned tickets
             setTickets((prev) => prev.filter((t) => t.ticket !== ticketNumber));
+            // Remove from orphaned tickets
+            setOrphanedTickets((prev) => prev.filter((t) => t.ticket_number !== ticketNumber));
           }}
           onProjectsUpdated={setProjects}
           bluestakesToken={bluestakesToken}

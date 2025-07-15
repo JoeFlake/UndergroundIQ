@@ -57,6 +57,22 @@ export async function getProjectsForTickets(ticketNumbers: string[]): Promise<Re
   }
 }
 
+// Function to fetch tickets with null project_id from database
+export async function fetchOrphanedTickets(): Promise<{ ticket_number: string; replace_by_date?: string }[]> {
+  try {
+    const { data, error } = await supabase
+      .from("project_tickets")
+      .select("ticket_number, replace_by_date")
+      .is("project_id", null);
+
+    if (error) throw error;
+    return data || [];
+  } catch (error: unknown) {
+    console.error("Error fetching orphaned tickets:", error);
+    return [];
+  }
+}
+
 // Function to fetch all tickets and handle assignments
 export async function fetchAllTickets(bluestakesToken: string) {
   // Fetch all tickets
@@ -97,24 +113,112 @@ export async function fetchAllTickets(bluestakesToken: string) {
       .map(ticket => ticket.old_ticket)
   );
 
-  // Fetch tickets needing update
-  const updateTickets = await bluestakesService.getTicketsNeedingUpdate(bluestakesToken);
+  // Fetch tickets needing update from database (where is_continue_update = true and due today or before)
+  const today = new Date().toISOString().split('T')[0]; // Get today's date in YYYY-MM-DD format
   
-  // Filter out duplicates and inactive tickets
-  const seenUpdateTickets = new Set<string>();
-  const uniqueUpdateTickets = updateTickets.filter((ticket) => {
-    if (seenUpdateTickets.has(ticket.ticket)) return false;
-    if (!activeTicketNumbers.has(ticket.ticket)) return false;
-    seenUpdateTickets.add(ticket.ticket);
-    return true;
+  const {
+    data: ticketsNeedingUpdateData,
+    error: updateTicketsError,
+  } = await supabase
+    .from("project_tickets")
+    .select("ticket_number, replace_by_date")
+    .eq("is_continue_update", true)
+    .lte("replace_by_date", today)
+    .order("replace_by_date", { ascending: true });
+
+  if (updateTicketsError) throw updateTicketsError;
+
+  console.log("Debug: Database tickets needing update", ticketsNeedingUpdateData?.length || 0);
+
+  // Convert database tickets to BlueStakes ticket format for compatibility
+  const updateTicketsFromDB = ticketsNeedingUpdateData || [];
+  const ticketsNeedingUpdatePromises = updateTicketsFromDB.map(async (dbTicket) => {
+    try {
+      // Fetch full ticket details from BlueStakes API
+      const ticketDetails = await bluestakesService.getTicketByNumber(
+        dbTicket.ticket_number,
+        bluestakesToken
+      );
+      return ticketDetails;
+         } catch (error) {
+       console.error(`Failed to fetch BlueStakes data for ticket ${dbTicket.ticket_number}:`, error);
+       // Return a minimal ticket object if BlueStakes data is unavailable
+       // We'll create a minimal object with required fields and cast it properly
+       const minimalTicket = {
+         ticket: dbTicket.ticket_number,
+         replace_by_date: dbTicket.replace_by_date,
+         revision: '',
+         completed: '',
+         type: '',
+         priority: '',
+         category: '',
+         lookup: '',
+         channel: '',
+         started: '',
+         original_ticket: '',
+         original_date: '',
+         expires: '',
+         account: '',
+         original_account: '',
+         caller_type: '',
+         name: '',
+         address1: '',
+         city: '',
+         cstate: '',
+         zip: '',
+         phone: '',
+         phone_ext: '',
+         caller: '',
+         caller_phone: '',
+         caller_phone_ext: '',
+         contact: '',
+         contact_phone: '',
+         contact_phone_ext: '',
+         cell: '',
+         email: '',
+         state: '',
+         county: '',
+         place: '',
+         subdivision: '',
+         lot: '',
+         st_from_address: '',
+         st_to_address: '',
+         street: '',
+         cross1: '',
+         cross2: '',
+         latitude: '',
+         longitude: '',
+         legal_date: '',
+         work_date: '',
+         response_due: '',
+         hours_notice_clock: 0,
+         hours_notice_business: 0,
+         work_type: '',
+         done_for: '',
+         svc_side_of_st: '',
+         boring: '',
+         rr: '',
+         extent_top: 0,
+         extent_left: 0,
+         extent_bottom: 0,
+         extent_right: 0,
+         area_in_miles: 0,
+         emergency: false,
+         blasting: false,
+         meet: false,
+         dig_in_road: false,
+         response_required: false,
+         location: '',
+         remarks: '',
+         comments: '',
+         members: [],
+         work_area: { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [] } },
+       } as unknown as BlueStakesTicket;
+       return minimalTicket;
+     }
   });
 
-  // Sort tickets by replace_by_date in ascending order
-  const sortedUpdateTickets = uniqueUpdateTickets.sort((a, b) => {
-    const dateA = a.replace_by_date ? new Date(a.replace_by_date).getTime() : Infinity;
-    const dateB = b.replace_by_date ? new Date(b.replace_by_date).getTime() : Infinity;
-    return dateA - dateB;
-  });
+  const sortedUpdateTickets = await Promise.all(ticketsNeedingUpdatePromises);
 
   // Filter out ALL assigned tickets, previous tickets, and expired tickets
   const now = new Date();

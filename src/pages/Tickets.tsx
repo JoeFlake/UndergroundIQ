@@ -62,6 +62,7 @@ type Ticket = BlueStakesTicket;
 interface ProjectTicket {
   ticket_number: string;
   project_id: number;
+  is_continue_update?: boolean;
   bluestakes_data?: BlueStakesTicket;
 }
 
@@ -161,7 +162,7 @@ export default function Tickets() {
         // Fetch tickets from Supabase for this project
         const { data: projectTickets, error: dbError } = await supabase
           .from("project_tickets")
-          .select("ticket_number, project_id")
+          .select("ticket_number, project_id, is_continue_update")
           .eq("project_id", projectId);
 
         if (dbError) throw dbError;
@@ -315,7 +316,7 @@ export default function Tickets() {
       // Fetch tickets from Supabase
       const { data: projectTickets, error: dbError } = await supabase
         .from("project_tickets")
-        .select("ticket_number, project_id")
+        .select("ticket_number, project_id, is_continue_update")
         .eq("project_id", projectId);
 
       if (dbError) throw dbError;
@@ -454,6 +455,7 @@ export default function Tickets() {
           {
             project_id: projectId,
             ticket_number: ticketNumber,
+            is_continue_update: true,
           },
         ]);
 
@@ -465,6 +467,7 @@ export default function Tickets() {
         {
           ticket_number: ticketNumber,
           project_id: projectId,
+          is_continue_update: true,
           bluestakes_data: ticket,
         },
       ]);
@@ -491,14 +494,14 @@ export default function Tickets() {
 
   const activeTickets = tickets.filter((ticket) => {
     if (!ticket.bluestakes_data) return true; // Show tickets that are still loading
-    return getStatus(ticket.bluestakes_data) === "Active";
+    return ticket.is_continue_update === true;
   });
 
   // Add function to calculate project center and work area from tickets
   const calculateProjectLocation = (tickets: ProjectTicket[]) => {
     const activeTickets = tickets.filter(
       (ticket) =>
-        ticket.bluestakes_data && getStatus(ticket.bluestakes_data) === "Active"
+        ticket.bluestakes_data && ticket.is_continue_update === true
     );
 
     if (activeTickets.length === 0) return;
@@ -529,7 +532,7 @@ export default function Tickets() {
         properties: {
           ...ticket.bluestakes_data!.work_area.properties,
           ticketNumber: ticket.ticket_number,
-          status: getStatus(ticket.bluestakes_data),
+          status: ticket.is_continue_update ? "Continue Updates" : "Updates Stopped",
         },
       }));
 
@@ -555,6 +558,45 @@ export default function Tickets() {
       calculateProjectLocation(tickets);
     }
   }, [tickets]);
+
+  // Handler for removing ticket from update list
+  const handleRemoveFromUpdateList = async (ticketNumber: string) => {
+    const projectId = Number(searchParams.get("project"));
+    if (!projectId) return;
+
+    try {
+      // Update the database
+      const { error } = await supabase
+        .from("project_tickets")
+        .update({ is_continue_update: false })
+        .eq("project_id", projectId)
+        .eq("ticket_number", ticketNumber);
+
+      if (error) throw error;
+
+      // Update the local state
+      setTickets((prev) =>
+        prev.map((ticket) =>
+          ticket.ticket_number === ticketNumber
+            ? { ...ticket, is_continue_update: false }
+            : ticket
+        )
+      );
+
+      toast({
+        title: "Success",
+        description: "Ticket removed from update list",
+      });
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: isErrorWithMessage(err)
+          ? err.message
+          : "Failed to remove ticket from update list",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Handler for adding assignee
   async function handleAddAssignee() {
@@ -731,7 +773,7 @@ export default function Tickets() {
                       </h4>
                       <div className="space-y-2">
                         <div className="text-sm text-muted-foreground">
-                          Active Tickets: {activeTickets.length}
+                          Tickets with Continue Updates: {activeTickets.length}
                         </div>
                       </div>
                     </div>
@@ -787,16 +829,16 @@ export default function Tickets() {
               <div className="text-red-500">{error}</div>
             ) : activeTickets.length === 0 ? (
               <div className="text-gray-500">
-                No active tickets assigned to this project.
+                No tickets with continue updates assigned to this project.
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Ticket #</TableHead>
-                    <TableHead>Status</TableHead>
                     <TableHead>Update Date</TableHead>
                     <TableHead>Address</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -815,23 +857,6 @@ export default function Tickets() {
                       <TableCell>{ticket.ticket_number}</TableCell>
                       <TableCell>
                         {ticket.bluestakes_data ? (
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              getStatus(ticket.bluestakes_data) === "Active"
-                                ? "bg-green-100 text-green-800"
-                                : "bg-gray-100 text-gray-800"
-                            }`}
-                          >
-                            {getStatus(ticket.bluestakes_data)}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">
-                            Loading...
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {ticket.bluestakes_data ? (
                           formatDate(ticket.bluestakes_data.replace_by_date)
                         ) : (
                           <span className="text-muted-foreground">
@@ -847,6 +872,22 @@ export default function Tickets() {
                             Loading...
                           </span>
                         )}
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu
+                          trigger={
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">Open menu</span>
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          }
+                        >
+                          <DropdownMenuItem
+                            onMouseDown={() => handleRemoveFromUpdateList(ticket.ticket_number)}
+                          >
+                            Remove from Update List
+                          </DropdownMenuItem>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}

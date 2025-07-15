@@ -40,6 +40,17 @@ export function AssignTicketModal({
     project.project_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Reset form state when ticket changes
+  useEffect(() => {
+    if (ticket) {
+      setSelectedProject("");
+      setSearchTerm("");
+      setShowDropdown(false);
+      setAssignError("");
+      setAssignSuccess("");
+    }
+  }, [ticket]);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -100,13 +111,45 @@ export function AssignTicketModal({
         bluestakesToken
       );
 
-      const { error } = await supabase.from("project_tickets").insert([
-        {
-          project_id: selectedProject,
-          ticket_number: ticket.ticket,
-          replace_by_date: ticketDetails.replace_by_date,
-        },
-      ]);
+      // Check if ticket already exists in the database
+      const { data: existingTicket, error: checkError } = await supabase
+        .from("project_tickets")
+        .select("id, project_id")
+        .eq("ticket_number", ticket.ticket)
+        .maybeSingle();
+
+      if (checkError && checkError.code !== "PGRST116") {
+        // PGRST116 is "no rows returned" - any other error is a real problem
+        throw checkError;
+      }
+
+      let error;
+      
+      if (existingTicket) {
+        // Ticket exists - update it with the new project_id
+        const updateResult = await supabase
+          .from("project_tickets")
+          .update({
+            project_id: selectedProject,
+            replace_by_date: ticketDetails.replace_by_date,
+            is_continue_update: true,
+          })
+          .eq("ticket_number", ticket.ticket);
+        
+        error = updateResult.error;
+      } else {
+        // Ticket doesn't exist - insert new row
+        const insertResult = await supabase.from("project_tickets").insert([
+          {
+            project_id: selectedProject,
+            ticket_number: ticket.ticket,
+            replace_by_date: ticketDetails.replace_by_date,
+            is_continue_update: true,
+          },
+        ]);
+        
+        error = insertResult.error;
+      }
       
       if (error) {
         setAssignError(error.message);
