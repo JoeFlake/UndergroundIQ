@@ -23,7 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { MoreVertical, Plus } from "lucide-react";
+import { MoreVertical, Plus, Share, Download } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useBluestakesAuth } from "@/hooks/useBluestakesAuth";
 import {
@@ -56,6 +56,7 @@ import { Label } from "@/components/ui/label";
 import { Map } from "../components/Map";
 import { Select } from "@/components/ui/select";
 import { generateSlug } from "../utils/slug";
+import { shareService } from "../lib/shareService";
 
 // Remove the Ticket type import and use BlueStakesTicket instead
 type Ticket = BlueStakesTicket;
@@ -102,6 +103,14 @@ function isErrorWithMessage(err: unknown): err is { message: string } {
     "message" in err &&
     typeof (err as { message: unknown }).message === "string"
   );
+}
+
+// Helper function to format role names
+function formatRoleName(roleKey: string): string {
+  return roleKey
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 }
 
 interface ProjectAssignee {
@@ -156,7 +165,7 @@ export default function Tickets() {
   const [isAddAssigneeOpen, setIsAddAssigneeOpen] = useState(false);
   const [assigneeName, setAssigneeName] = useState("");
   const [assigneeEmail, setAssigneeEmail] = useState("");
-  const [assigneeRole, setAssigneeRole] = useState("sup");
+  const [assigneeRole, setAssigneeRole] = useState("superintendent");
   const [isAddingAssignee, setIsAddingAssignee] = useState(false);
 
   useEffect(() => {
@@ -239,10 +248,10 @@ export default function Tickets() {
       const projectId = await getProjectIdFromSlug(projectSlug);
       if (!projectId) return;
 
-      // Fetch project with pm_user, super (jsonb), and other_user (jsonb[])
+      // Fetch project with project_roles JSON column
       const { data: project, error: projectError } = await supabase
         .from("projects")
-        .select("pm_user, super, other_user")
+        .select("project_roles")
         .eq("id", projectId)
         .single();
 
@@ -252,42 +261,41 @@ export default function Tickets() {
       }
 
       const assignees: ProjectAssignee[] = [];
-      // PM
-      if (project.pm_user) {
-        const { data: pmUser } = await supabase
-          .from("users")
-          .select("id, email, role, name")
-          .eq("id", project.pm_user)
-          .single();
-        if (pmUser) {
-          assignees.push({
-            id: pmUser.id,
-            name: pmUser.name || pmUser.email,
-            role: "Project Manager",
-            email: pmUser.email,
-          });
-        }
-      }
-      // Superintendent (from jsonb)
-      if (project.super && (project.super.name || project.super.email)) {
-        assignees.push({
-          id: "super",
-          name: project.super.name || "",
-          role: "Superintendent",
-          email: project.super.email || "",
+      
+      // Parse project_roles JSON object
+      if (project.project_roles && typeof project.project_roles === 'object') {
+        const roles = project.project_roles;
+        
+        // Add assignees from the roles object
+        Object.entries(roles).forEach(([roleKey, roleData]: [string, any]) => {
+          if (roleData && typeof roleData === 'object') {
+            // Handle array of users for a role
+            if (Array.isArray(roleData)) {
+              roleData.forEach((user, idx) => {
+                                 if (user.name || user.email) {
+                   assignees.push({
+                     id: `${roleKey}-${idx}`,
+                     name: user.name || user.email || '',
+                     role: formatRoleName(roleKey),
+                     email: user.email || '',
+                   });
+                 }
+              });
+            } else {
+              // Handle single user for a role
+                             if (roleData.name || roleData.email) {
+                 assignees.push({
+                   id: roleKey,
+                   name: roleData.name || roleData.email || '',
+                   role: formatRoleName(roleKey),
+                   email: roleData.email || '',
+                 });
+               }
+            }
+          }
         });
       }
-      // Other users (jsonb array)
-      if (Array.isArray(project.other_user)) {
-        project.other_user.forEach((other, idx) => {
-          assignees.push({
-            id: `other-${idx}`,
-            name: other.name,
-            role: "Other",
-            email: other.email,
-          });
-        });
-      }
+      
       setProjectAssignees(assignees);
     }
     fetchAssignees();
@@ -655,57 +663,87 @@ export default function Tickets() {
 
     const projectId = await getProjectIdFromSlug(projectSlug);
     if (!projectId) return;
+    
     try {
-      if (assigneeRole === "pm") {
-        // Upsert user and update pm_user
-        const { data: user, error: userError } = await supabase
-          .from("users")
-          .upsert({ email: assigneeEmail, name: assigneeName }, { onConflict: "email" })
-          .select()
-          .single();
-        if (userError || !user) throw userError || new Error("User upsert failed");
-        await supabase.from("projects").update({ pm_user: user.id }).eq("id", projectId);
-      } else if (assigneeRole === "sup") {
-        // Update the 'super' jsonb column with name and email
-        const { error } = await supabase.from("projects").update({
-          super: { name: assigneeName, email: assigneeEmail },
-        }).eq("id", projectId);
-        if (error) {
-          console.error("Supabase update error:", error);
-          toast({ title: "Error", description: error.message, variant: "destructive" });
-        }
-      } else if (assigneeRole === "other") {
-        // Fetch current other_user array
-        const { data: project, error: fetchError } = await supabase
-          .from("projects")
-          .select("other_user")
-          .eq("id", projectId)
-          .single();
-        if (fetchError || !project) {
-          toast({ title: "Error", description: "Could not fetch current other assignees", variant: "destructive" });
-          return;
-        }
-        const currentOthers = Array.isArray(project.other_user) ? project.other_user : [];
-        const newOthers = [
-          ...currentOthers,
-          { name: assigneeName, email: assigneeEmail }
-        ];
-        const { error: updateError } = await supabase
-          .from("projects")
-          .update({ other_user: newOthers })
-          .eq("id", projectId);
-        if (updateError) {
-          toast({ title: "Error", description: updateError.message, variant: "destructive" });
-        }
-      } else {
-        toast({ title: "Info", description: "Other assignees are not stored in the project table.", variant: "default" });
+      // Fetch current project_roles
+      const { data: project, error: fetchError } = await supabase
+        .from("projects")
+        .select("project_roles")
+        .eq("id", projectId)
+        .single();
+      
+      if (fetchError || !project) {
+        toast({ title: "Error", description: "Could not fetch current project roles", variant: "destructive" });
+        return;
       }
+
+      // Get current roles or initialize empty object
+      const currentRoles = project.project_roles || {};
+      
+      // Add the new assignee to the appropriate role
+      const newAssignee = { name: assigneeName, email: assigneeEmail };
+      
+      if (assigneeRole === "superintendent") {
+        // For superintendent, store as single object
+        currentRoles.superintendent = newAssignee;
+      } else {
+        // For other roles, store as array or add to existing array
+        if (!currentRoles[assigneeRole]) {
+          currentRoles[assigneeRole] = [];
+        } else if (!Array.isArray(currentRoles[assigneeRole])) {
+          // Convert single object to array if needed
+          currentRoles[assigneeRole] = [currentRoles[assigneeRole]];
+        }
+        currentRoles[assigneeRole].push(newAssignee);
+      }
+
+      // Update the project with new roles
+      const { error: updateError } = await supabase
+        .from("projects")
+        .update({ project_roles: currentRoles })
+        .eq("id", projectId);
+
+      if (updateError) {
+        toast({ title: "Error", description: updateError.message, variant: "destructive" });
+        return;
+      }
+
+      toast({ title: "Success", description: "Assignee added successfully" });
+      
       setIsAddAssigneeOpen(false);
       setAssigneeName("");
       setAssigneeEmail("");
-      setAssigneeRole("sup");
-      // Optionally, refetch assignees
-      // ...
+      setAssigneeRole("superintendent");
+      
+      // Refresh assignees list
+      const updatedAssignees: ProjectAssignee[] = [];
+      Object.entries(currentRoles).forEach(([roleKey, roleData]: [string, any]) => {
+        if (roleData && typeof roleData === 'object') {
+          if (Array.isArray(roleData)) {
+            roleData.forEach((user, idx) => {
+                             if (user.name || user.email) {
+                 updatedAssignees.push({
+                   id: `${roleKey}-${idx}`,
+                   name: user.name || user.email || '',
+                   role: formatRoleName(roleKey),
+                   email: user.email || '',
+                 });
+               }
+            });
+          } else {
+                         if (roleData.name || roleData.email) {
+               updatedAssignees.push({
+                 id: roleKey,
+                 name: roleData.name || roleData.email || '',
+                 role: formatRoleName(roleKey),
+                 email: roleData.email || '',
+               });
+             }
+          }
+        }
+      });
+      setProjectAssignees(updatedAssignees);
+      
     } catch (err) {
       toast({ title: "Error", description: isErrorWithMessage(err) ? err.message : "Failed to add assignee", variant: "destructive" });
     } finally {
@@ -825,7 +863,7 @@ export default function Tickets() {
                       </h4>
                       <div className="space-y-2">
                         <div className="text-sm text-muted-foreground">
-                          Tickets with Continue Updates: {activeTickets.length}
+                          Active Tickets: {activeTickets.length}
                         </div>
                       </div>
                     </div>
@@ -881,7 +919,7 @@ export default function Tickets() {
               <div className="text-red-500">{error}</div>
             ) : activeTickets.length === 0 ? (
               <div className="text-gray-500">
-                No tickets with continue updates assigned to this project.
+                No active tickets for this project.
               </div>
             ) : (
               <Table>
@@ -935,6 +973,37 @@ export default function Tickets() {
                           }
                         >
                           <DropdownMenuItem
+                            onMouseDown={async () => {
+                              try {
+                                await shareService.copyTicketLink(ticket.ticket_number, {
+                                  includeProjectContext: true,
+                                  expiresIn: 24,
+                                });
+                                toast({
+                                  title: "Link Copied",
+                                  description: "Shareable link copied to clipboard",
+                                });
+                              } catch (error) {
+                                toast({
+                                  title: "Error",
+                                  description: "Failed to copy share link",
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
+                          >
+                            <Share className="mr-2 h-4 w-4" />
+                            Share Link
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onMouseDown={() => {
+                              shareService.printTicketCard(ticket.ticket_number);
+                            }}
+                          >
+                            <Download className="mr-2 h-4 w-4" />
+                            Export as PDF
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
                             onMouseDown={() => handleRemoveFromUpdateList(ticket.ticket_number)}
                           >
                             Remove from Update List
@@ -984,7 +1053,10 @@ export default function Tickets() {
                   onChange={(e) => setAssigneeRole(e.target.value)}
                   disabled={isAddingAssignee}
                 >
-                  <option value="sup">Superintendent</option>
+                  <option value="superintendent">Superintendent</option>
+                  <option value="project_manager">Project Manager</option>
+                  <option value="foreman">Foreman</option>
+                  <option value="inspector">Inspector</option>
                   <option value="other">Other</option>
                 </select>
               </div>

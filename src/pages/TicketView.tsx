@@ -29,6 +29,7 @@ const TicketView = () => {
   const { ticketId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const isPrintMode = searchParams.get('print') === 'true';
 
   // Helper function to resolve project slug to ID
   const getProjectIdFromSlug = async (slug: string): Promise<number | null> => {
@@ -62,6 +63,72 @@ const TicketView = () => {
   const [loadingSecondaryFunctions, setLoadingSecondaryFunctions] =
     useState(true);
   const { toast } = useToast();
+
+  // Handle print mode
+  useEffect(() => {
+    if (isPrintMode) {
+      // Add print styles
+      const printStyles = document.createElement('style');
+      printStyles.id = 'ticket-print-styles';
+      printStyles.innerHTML = `
+        @media print {
+          @page {
+            margin: 0.5in;
+            size: A4;
+          }
+          
+          body {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          
+          .print-hide {
+            display: none !important;
+          }
+          
+          .ticket-card {
+            width: 100% !important;
+            max-width: none !important;
+            box-shadow: none !important;
+            margin: 0 !important;
+          }
+          
+          .map-container {
+            height: 400px !important;
+            page-break-inside: avoid;
+          }
+          
+          .ticket-section {
+            page-break-inside: avoid;
+            margin-bottom: 20px;
+          }
+          
+          body {
+            font-size: 12pt;
+            line-height: 1.4;
+          }
+          
+          h1, h2, h3 {
+            page-break-after: avoid;
+          }
+        }
+      `;
+      document.head.appendChild(printStyles);
+
+      // Wait for content to load, then print
+      const timer = setTimeout(() => {
+        window.print();
+      }, 1000);
+
+      return () => {
+        clearTimeout(timer);
+        const existingStyles = document.getElementById('ticket-print-styles');
+        if (existingStyles) {
+          existingStyles.remove();
+        }
+      };
+    }
+  }, [isPrintMode, currentTicket]);
 
   useEffect(() => {
     const fetchTicketData = async () => {
@@ -292,7 +359,7 @@ const TicketView = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-4">
+        <div className={`flex justify-between items-center mb-4 ${isPrintMode ? 'print-hide' : ''}`}>
           <Button variant="ghost" onClick={handleBack}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to {projectName ? `${projectName}` : "Dashboard"}
@@ -339,7 +406,7 @@ const TicketView = () => {
           )}
         </div>
 
-        <Card className="mb-8 animate-fade-in">
+        <Card className={`mb-8 animate-fade-in ticket-card ${isPrintMode ? 'ticket-section' : ''}`}>
           <CardHeader>
             <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
               <div>
@@ -426,31 +493,33 @@ const TicketView = () => {
                 <h3 className="text-3xl font-medium mb-2 text-gray-600">
                   Map & Location
                 </h3>
-                {hasCoords &&
-                currentTicket.work_area &&
-                currentTicket.work_area.type === "Feature" &&
-                currentTicket.work_area.geometry ? (
-                  <Map
-                    lat={lat}
-                    lng={lng}
-                    workAreaGeoJSON={currentTicket.work_area}
-                    showTooltips={false}
-                  />
-                ) : currentTicket.map_url ? (
-                  <iframe
-                    src={currentTicket.map_url}
-                    title="Ticket Map"
-                    width="100%"
-                    height="350"
-                    style={{ border: 0 }}
-                    allowFullScreen={true}
-                    loading="lazy"
-                  ></iframe>
-                ) : (
-                  <div className="text-gray-500">
-                    No map available for this ticket.
-                  </div>
-                )}
+                <div className="map-container">
+                  {hasCoords &&
+                  currentTicket.work_area &&
+                  currentTicket.work_area.type === "Feature" &&
+                  currentTicket.work_area.geometry ? (
+                    <Map
+                      lat={lat}
+                      lng={lng}
+                      workAreaGeoJSON={currentTicket.work_area}
+                      showTooltips={false}
+                    />
+                  ) : currentTicket.map_url ? (
+                    <iframe
+                      src={currentTicket.map_url}
+                      title="Ticket Map"
+                      width="100%"
+                      height="350"
+                      style={{ border: 0 }}
+                      allowFullScreen={true}
+                      loading="lazy"
+                    ></iframe>
+                  ) : (
+                    <div className="text-gray-500">
+                      No map available for this ticket.
+                    </div>
+                  )}
+                </div>
                 <div className="mt-4">
                   <div>
                     <span className="font-semibold">Street:</span>{" "}
