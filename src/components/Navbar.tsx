@@ -87,9 +87,9 @@ export function Navbar() {
               {/* To Do tab only for admins */}
               {isAdmin && (
                 <button
-                  onClick={() => navigate("/unassigned-tickets")}
+                  onClick={() => navigate("/todo")}
                   className={`border-b-2 px-1 pt-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-gray-200 focus:ring-opacity-75 rounded-sm inline-flex items-center ${
-                    isActive("/unassigned-tickets")
+                    isActive("/todo")
                       ? "border-orange-500 text-orange-600"
                       : "border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-900"
                   }`}
@@ -124,7 +124,7 @@ export function Navbar() {
               >
                 <DropdownMenuItem onClick={() => navigate("/")}> <HomeIcon className="h-4 w-4 mr-2" /> Home</DropdownMenuItem>
                 {isAdmin && (
-                  <DropdownMenuItem onClick={() => navigate("/unassigned-tickets")}> <CheckSquare className="h-4 w-4 mr-2" /> To Do</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/todo")}> <CheckSquare className="h-4 w-4 mr-2" /> To Do</DropdownMenuItem>
                 )}
                 {isAdmin && (
                   <DropdownMenuItem onClick={() => navigate("/admin")}> <Shield className="h-4 w-4 mr-2" /> Admin Panel</DropdownMenuItem>
@@ -169,7 +169,7 @@ export function Navbar() {
               >
                 <DropdownMenuItem onClick={() => navigate("/")}> <HomeIcon className="h-4 w-4 mr-2" /> Home</DropdownMenuItem>
                 {isAdmin && (
-                  <DropdownMenuItem onClick={() => navigate("/unassigned-tickets")}> <CheckSquare className="h-4 w-4 mr-2" /> To Do</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/todo")}> <CheckSquare className="h-4 w-4 mr-2" /> To Do</DropdownMenuItem>
                 )}
                 {isAdmin && (
                   <DropdownMenuItem onClick={() => navigate("/admin")}> <Shield className="h-4 w-4 mr-2" /> Admin Panel</DropdownMenuItem>

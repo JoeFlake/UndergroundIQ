@@ -12,6 +12,7 @@ import { useBluestakesAuth } from "@/hooks/useBluestakesAuth";
 import { supabase } from "@/lib/supabaseClient";
 import { Map } from "../components/Map";
 import { useToast } from "@/components/ui/use-toast";
+import { generateSlug } from "../utils/slug";
 
 interface SecondaryFunctions {
   ticket: string;
@@ -28,7 +29,23 @@ const TicketView = () => {
   const { ticketId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const projectId = searchParams.get("project");
+
+  // Helper function to resolve project slug to ID
+  const getProjectIdFromSlug = async (slug: string): Promise<number | null> => {
+    try {
+      const { data, error } = await supabase
+        .from("projects")
+        .select("id, name");
+
+      if (error || !data) return null;
+
+      // Find project by matching slug generated from name
+      const project = data.find(p => generateSlug(p.name) === slug);
+      return project ? Number(project.id) : null;
+    } catch {
+      return null;
+    }
+  };
   const [currentTicket, setCurrentTicket] = useState(null);
   const [responses, setResponses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -66,15 +83,21 @@ const TicketView = () => {
   }, [ticketId, bluestakesToken]);
 
   useEffect(() => {
-    const projectId = Number(searchParams.get("project"));
-    if (projectId) {
-      supabase
-        .from("projects")
-        .select("name")
-        .eq("id", projectId)
-        .single()
-        .then(({ data }) => setProjectName(data?.name || null));
+    async function fetchProjectName() {
+      const projectSlug = searchParams.get("project");
+      if (!projectSlug) return;
+
+      const projectId = await getProjectIdFromSlug(projectSlug);
+      if (projectId) {
+        const { data } = await supabase
+          .from("projects")
+          .select("name")
+          .eq("id", projectId)
+          .single();
+        setProjectName(data?.name || null);
+      }
     }
+    fetchProjectName();
   }, [searchParams]);
 
   useEffect(() => {
@@ -118,8 +141,9 @@ const TicketView = () => {
   }, [ticketId, bluestakesToken]);
 
   const handleBack = () => {
-    if (projectId) {
-      navigate(`/tickets?project=${encodeURIComponent(projectId)}`);
+    const projectSlug = searchParams.get("project");
+    if (projectSlug) {
+      navigate(`/tickets?project=${encodeURIComponent(projectSlug)}`);
     } else {
       navigate("/");
     }

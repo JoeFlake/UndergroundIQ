@@ -55,6 +55,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Label } from "@/components/ui/label";
 import { Map } from "../components/Map";
 import { Select } from "@/components/ui/select";
+import { generateSlug } from "../utils/slug";
 
 // Remove the Ticket type import and use BlueStakesTicket instead
 type Ticket = BlueStakesTicket;
@@ -120,6 +121,23 @@ export default function Tickets() {
   } = useBluestakesAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  // Helper function to resolve project slug to ID
+  const getProjectIdFromSlug = async (slug: string): Promise<number | null> => {
+    try {
+      const { data, error } = await supabase
+        .from("projects")
+        .select("id, name");
+
+      if (error || !data) return null;
+
+      // Find project by matching slug generated from name
+      const project = data.find(p => generateSlug(p.name) === slug);
+      return project ? Number(project.id) : null;
+    } catch {
+      return null;
+    }
+  };
   const [tickets, setTickets] = useState<ProjectTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -152,7 +170,14 @@ export default function Tickets() {
       setLoading(true);
       setError("");
       try {
-        const projectId = Number(searchParams.get("project"));
+        const projectSlug = searchParams.get("project");
+        if (!projectSlug) {
+          setTickets([]);
+          setLoading(false);
+          return;
+        }
+
+        const projectId = await getProjectIdFromSlug(projectSlug);
         if (!projectId) {
           setTickets([]);
           setLoading(false);
@@ -189,20 +214,29 @@ export default function Tickets() {
   }, [user, searchParams, bluestakesToken]);
 
   useEffect(() => {
-    const projectId = Number(searchParams.get("project"));
-    if (projectId) {
-      supabase
-        .from("projects")
-        .select("name")
-        .eq("id", projectId)
-        .single()
-        .then(({ data }) => setProjectName(data?.name || null));
+    async function fetchProjectName() {
+      const projectSlug = searchParams.get("project");
+      if (!projectSlug) return;
+
+      const projectId = await getProjectIdFromSlug(projectSlug);
+      if (projectId) {
+        const { data } = await supabase
+          .from("projects")
+          .select("name")
+          .eq("id", projectId)
+          .single();
+        setProjectName(data?.name || null);
+      }
     }
+    fetchProjectName();
   }, [searchParams]);
 
   useEffect(() => {
     async function fetchAssignees() {
-      const projectId = Number(searchParams.get("project"));
+      const projectSlug = searchParams.get("project");
+      if (!projectSlug) return;
+
+      const projectId = await getProjectIdFromSlug(projectSlug);
       if (!projectId) return;
 
       // Fetch project with pm_user, super (jsonb), and other_user (jsonb[])
@@ -307,7 +341,13 @@ export default function Tickets() {
     if (!bluestakesToken) return;
     setLoading(true);
     try {
-      const projectId = Number(searchParams.get("project"));
+      const projectSlug = searchParams.get("project");
+      if (!projectSlug) {
+        setTickets([]);
+        return;
+      }
+
+      const projectId = await getProjectIdFromSlug(projectSlug);
       if (!projectId) {
         setTickets([]);
         return;
@@ -339,7 +379,10 @@ export default function Tickets() {
   };
 
   const handleDeleteProject = async () => {
-    const projectId = Number(searchParams.get("project"));
+    const projectSlug = searchParams.get("project");
+    if (!projectSlug) return;
+
+    const projectId = await getProjectIdFromSlug(projectSlug);
     if (!projectId) return;
 
     setIsDeleting(true);
@@ -412,7 +455,10 @@ export default function Tickets() {
       return;
     }
 
-    const projectId = Number(searchParams.get("project"));
+    const projectSlug = searchParams.get("project");
+    if (!projectSlug) return;
+
+    const projectId = await getProjectIdFromSlug(projectSlug);
     if (!projectId) return;
 
     setIsAddingTicket(true);
@@ -561,7 +607,10 @@ export default function Tickets() {
 
   // Handler for removing ticket from update list
   const handleRemoveFromUpdateList = async (ticketNumber: string) => {
-    const projectId = Number(searchParams.get("project"));
+    const projectSlug = searchParams.get("project");
+    if (!projectSlug) return;
+
+    const projectId = await getProjectIdFromSlug(projectSlug);
     if (!projectId) return;
 
     try {
@@ -601,7 +650,10 @@ export default function Tickets() {
   // Handler for adding assignee
   async function handleAddAssignee() {
     setIsAddingAssignee(true);
-    const projectId = Number(searchParams.get("project"));
+    const projectSlug = searchParams.get("project");
+    if (!projectSlug) return;
+
+    const projectId = await getProjectIdFromSlug(projectSlug);
     if (!projectId) return;
     try {
       if (assigneeRole === "pm") {

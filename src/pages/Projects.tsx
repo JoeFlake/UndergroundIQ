@@ -28,10 +28,12 @@ import {
   DropdownMenuSeparator 
 } from "../components/ui/dropdown-menu";
 import { MapPin, ExternalLink, Folder, Plus, MoreVertical, Edit, Archive, Filter, FileText } from "lucide-react";
+import { generateSlug } from "../utils/slug";
 
 interface Project {
   id: string;
   name: string;
+  slug: string;
   created_by: string;
   ticket_count: number;
   created_at?: string;
@@ -178,6 +180,7 @@ export default function Projects() {
         return {
           id: project.id,
           name: project.name,
+          slug: generateSlug(project.name),
           created_by: project.created_by,
           ticket_count: countError ? 0 : count || 0,
           project_roles: project.project_roles,
@@ -247,7 +250,7 @@ export default function Projects() {
   const filteredProjects = getFilteredProjects();
 
   const handleProjectClick = (project: Project) => {
-    navigate(`/tickets?project=${project.id}`);
+    navigate(`/tickets?project=${project.slug}`);
   };
 
   const handleCreateProject = async () => {

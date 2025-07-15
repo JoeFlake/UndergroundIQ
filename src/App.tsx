@@ -58,7 +58,7 @@ function App() {
                 <Route path="/" element={<Projects />} />
                 <Route path="/tickets" element={<Tickets />} />
                 <Route path="/tickets/:ticketId" element={<TicketView />} />
-                <Route path="/unassigned-tickets" element={<UnassignedTickets />} />
+                <Route path="/todo" element={<UnassignedTickets />} />
               </Route>
 
               {/* Admin routes */}
