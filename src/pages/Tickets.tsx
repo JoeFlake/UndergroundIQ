@@ -546,10 +546,28 @@ export default function Tickets() {
     }
   };
 
-  const activeTickets = tickets.filter((ticket) => {
-    if (!ticket.bluestakes_data) return true; // Show tickets that are still loading
-    return ticket.is_continue_update === true;
-  });
+  const activeTickets = tickets
+    .filter((ticket) => {
+      if (!ticket.bluestakes_data) return true; // Show tickets that are still loading
+      return ticket.is_continue_update === true;
+    })
+    .sort((a, b) => {
+      // Sort by replace_by_date in descending order (newest first)
+      const dateA = a.bluestakes_data?.replace_by_date;
+      const dateB = b.bluestakes_data?.replace_by_date;
+      
+      // If both tickets have dates, compare them
+      if (dateA && dateB) {
+        return new Date(dateB).getTime() - new Date(dateA).getTime();
+      }
+      
+      // If only one has a date, prioritize the one with a date
+      if (dateA && !dateB) return -1;
+      if (!dateA && dateB) return 1;
+      
+      // If neither has a date, maintain original order
+      return 0;
+    });
 
   // Add function to calculate project center and work area from tickets
   const calculateProjectLocation = (tickets: ProjectTicket[]) => {
