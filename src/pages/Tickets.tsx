@@ -56,7 +56,7 @@ import { Label } from "@/components/ui/label";
 import { Map } from "../components/Map";
 import { Select } from "@/components/ui/select";
 import { generateSlug } from "../utils/slug";
-import { shareService } from "@/lib/shareService";
+import { shareService } from "@/lib/shareService.ts";
 
 // Remove the Ticket type import and use BlueStakesTicket instead
 type Ticket = BlueStakesTicket;

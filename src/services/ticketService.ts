@@ -87,17 +87,21 @@ export async function fetchAllTickets(bluestakesToken: string) {
       ticket_number: string;
       old_ticket: string | null;
       is_continue_update: boolean;
+      project_id: number;
     }[] | null; 
     error: unknown 
   } = await supabase
     .from("project_tickets")
-    .select("ticket_number, old_ticket, is_continue_update");
+    .select("ticket_number, old_ticket, is_continue_update, project_id");
   
   if (projectTicketsError) throw projectTicketsError;
 
   // Create sets for ALL assigned tickets and previous tickets
+  const assignedTickets = (projectTickets || []).filter(ticket => ticket.project_id !== null);
+  const orphanedTickets = (projectTickets || []).filter(ticket => ticket.project_id === null);
+  
   const allAssignedTicketNumbers = new Set(
-    (projectTickets || []).map(ticket => ticket.ticket_number)
+    assignedTickets.map(ticket => ticket.ticket_number)
   );
   
   // Keep active tickets set for the updates functionality
@@ -128,7 +132,7 @@ export async function fetchAllTickets(bluestakesToken: string) {
 
   if (updateTicketsError) throw updateTicketsError;
 
-  console.log("Debug: Database tickets needing update", ticketsNeedingUpdateData?.length || 0);
+
 
   // Convert database tickets to BlueStakes ticket format for compatibility
   const updateTicketsFromDB = ticketsNeedingUpdateData || [];
@@ -230,6 +234,8 @@ export async function fetchAllTickets(bluestakesToken: string) {
       new Date(ticket.replace_by_date) > now
   );
 
+
+
   // Process ticket updates
   const updatePromises = unassignedTickets.map(async (ticket) => {
     try {
@@ -240,25 +246,45 @@ export async function fetchAllTickets(bluestakesToken: string) {
 
       if (ticketDetails.original_ticket) {
         const originalTicket = projectTickets?.find(
-          pt => pt.ticket_number === ticketDetails.original_ticket && pt.is_continue_update
+          pt => pt.ticket_number === ticketDetails.original_ticket
         );
 
         if (originalTicket) {
-          await supabase
-            .from("project_tickets")
-            .update({ is_continue_update: false })
-            .eq("ticket_number", ticketDetails.original_ticket);
+          try {
+            // Only update the original ticket if it was being tracked for updates
+            if (originalTicket.is_continue_update) {
+              const { error: updateError } = await supabase
+                .from("project_tickets")
+                .update({ is_continue_update: false })
+                .eq("ticket_number", ticketDetails.original_ticket);
 
-          await supabase
-            .from("project_tickets")
-            .insert({
-              ticket_number: ticket.ticket,
-              old_ticket: ticketDetails.original_ticket,
-              replace_by_date: ticketDetails.replace_by_date,
-              is_continue_update: true
-            });
+              if (updateError) {
+                console.error(`Error updating original ticket ${ticketDetails.original_ticket}:`, updateError);
+                return false;
+              }
+            }
 
-          return true;
+            // Insert the new ticket
+            const { error: insertError } = await supabase
+              .from("project_tickets")
+              .insert({
+                ticket_number: ticket.ticket,
+                old_ticket: ticketDetails.original_ticket,
+                replace_by_date: ticketDetails.replace_by_date,
+                is_continue_update: true,
+                project_id: originalTicket.project_id
+              });
+
+            if (insertError) {
+              console.error(`Error inserting new ticket ${ticket.ticket}:`, insertError);
+              return false;
+            }
+
+            return true;
+          } catch (dbError) {
+            console.error(`Database error during auto-assignment of ticket ${ticket.ticket}:`, dbError);
+            return false;
+          }
         }
       }
       return false;
