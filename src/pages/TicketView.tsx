@@ -3,16 +3,21 @@ import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  DropdownMenu,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+import {
   bluestakesService,
   type TicketSecondaryFunction,
 } from "@/lib/bluestakesService";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, MoreVertical, FileDown } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBluestakesAuth } from "@/hooks/useBluestakesAuth";
 import { supabase } from "@/lib/supabaseClient";
 import { Map } from "../components/Map";
 import { useToast } from "@/components/ui/use-toast";
 import { generateSlug } from "../utils/slug";
+
 
 interface SecondaryFunctions {
   ticket: string;
@@ -218,6 +223,15 @@ const TicketView = () => {
 
   const handleSecondaryFunction = async (action: string) => {
     if (!ticketId || !bluestakesToken) return;
+    
+    if (action === "export") {
+      toast({
+        title: "Coming Soon",
+        description: "PDF export will be available via backend generation.",
+      });
+      return;
+    }
+    
     try {
       // REMOVE DEBUG LOGGING FOR SECURITY
     } catch (error) {
@@ -364,46 +378,41 @@ const TicketView = () => {
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to {projectName ? `${projectName}` : "Dashboard"}
           </Button>
-          {!loadingSecondaryFunctions && secondaryFunctions && (
-            <div className="flex gap-2">
-              {secondaryFunctions.cancel && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleSecondaryFunction("cancel")}
-                >
-                  Cancel
-                </Button>
-              )}
-              {secondaryFunctions.remark && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleSecondaryFunction("remark")}
-                >
-                  Remark
-                </Button>
-              )}
-              {secondaryFunctions.secondNotice && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleSecondaryFunction("second notice")}
-                >
-                  Second Notice
-                </Button>
-              )}
-              {secondaryFunctions.update && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleSecondaryFunction("update")}
-                >
-                  Update
-                </Button>
-              )}
-            </div>
-          )}
+                      {!loadingSecondaryFunctions && secondaryFunctions && (
+             <DropdownMenu
+               trigger={
+                 <Button variant="ghost" className="h-8 w-8 p-0">
+                   <span className="sr-only">Open menu</span>
+                   <MoreVertical className="h-4 w-4" />
+                 </Button>
+               }
+             >
+               {secondaryFunctions.cancel && (
+                 <DropdownMenuItem onMouseDown={() => handleSecondaryFunction("cancel")}>
+                   Cancel
+                 </DropdownMenuItem>
+               )}
+               {secondaryFunctions.remark && (
+                 <DropdownMenuItem onMouseDown={() => handleSecondaryFunction("remark")}>
+                   Remark
+                 </DropdownMenuItem>
+               )}
+               {secondaryFunctions.secondNotice && (
+                 <DropdownMenuItem onMouseDown={() => handleSecondaryFunction("second notice")}>
+                   Second Notice
+                 </DropdownMenuItem>
+               )}
+               {secondaryFunctions.update && (
+                 <DropdownMenuItem onMouseDown={() => handleSecondaryFunction("update")}>
+                   Update
+                 </DropdownMenuItem>
+               )}
+               <DropdownMenuItem onMouseDown={() => handleSecondaryFunction("export")}>
+                 <FileDown className="mr-2 h-4 w-4" />
+                 Export as PDF
+               </DropdownMenuItem>
+             </DropdownMenu>
+            )}
         </div>
 
         <Card className={`mb-8 animate-fade-in ticket-card ${isPrintMode ? 'ticket-section' : ''}`}>
