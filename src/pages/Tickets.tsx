@@ -1015,7 +1015,10 @@ export default function Tickets() {
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onMouseDown={() => {
-                              shareService.printTicketCard(ticket.ticket_number);
+                              toast({
+                                title: "Coming Soon",
+                                description: "PDF export feature is in development",
+                              });
                             }}
                           >
                             <Download className="mr-2 h-4 w-4" />
