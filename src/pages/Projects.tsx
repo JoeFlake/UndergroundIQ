@@ -474,18 +474,10 @@ export default function Projects() {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-              Projects for {companyName}
-            </h1>
-          </div>
-          <Button
-            onClick={() => setShowTicketRequestModal(true)}
-            className="ml-4 flex items-center gap-2"
-          >
-            <FileText className="h-4 w-4" /> Request Ticket
-          </Button>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+            Projects for {companyName}
+          </h1>
         </div>
         {/* Create Project Modal */}
         {userRole === "admin" && showCreateModal && (
@@ -642,37 +634,46 @@ export default function Projects() {
         )}
 
         {/* Filter Controls */}
-        <div className="mb-6 flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-gray-600" />
-            <span className="text-sm font-medium text-gray-700">View:</span>
+        <div className="mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-gray-600" />
+              <span className="text-sm font-medium text-gray-700">View:</span>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant={currentFilter === "my-projects" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setCurrentFilter("my-projects")}
+                className="text-sm"
+              >
+                My Projects
+              </Button>
+              <Button
+                variant={currentFilter === "active-projects" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setCurrentFilter("active-projects")}
+                className="text-sm"
+              >
+                Active Projects
+              </Button>
+              <Button
+                variant={currentFilter === "all-projects" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setCurrentFilter("all-projects")}
+                className="text-sm"
+              >
+                All Projects
+              </Button>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant={currentFilter === "my-projects" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setCurrentFilter("my-projects")}
-              className="text-sm"
-            >
-              My Projects
-            </Button>
-            <Button
-              variant={currentFilter === "active-projects" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setCurrentFilter("active-projects")}
-              className="text-sm"
-            >
-              Active Projects
-            </Button>
-            <Button
-              variant={currentFilter === "all-projects" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setCurrentFilter("all-projects")}
-              className="text-sm"
-            >
-              All Projects
-            </Button>
-          </div>
+          <Button
+            onClick={() => setShowTicketRequestModal(true)}
+            className="flex items-center gap-2"
+            size="sm"
+          >
+            <FileText className="h-4 w-4" /> Request Ticket
+          </Button>
         </div>
 
         {/* Projects grid */}
