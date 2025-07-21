@@ -117,8 +117,10 @@ export async function fetchAllTickets(bluestakesToken: string) {
       .map(ticket => ticket.old_ticket)
   );
 
-  // Fetch tickets needing update from database (where is_continue_update = true and due today or before)
-  const today = new Date().toISOString().split('T')[0]; // Get today's date in YYYY-MM-DD format
+  // Fetch tickets needing update from database (where is_continue_update = true and due within 7 days)
+  const today = new Date();
+  const sevenDaysFromNow = new Date();
+  sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
   
   const {
     data: ticketsNeedingUpdateData,
@@ -127,12 +129,10 @@ export async function fetchAllTickets(bluestakesToken: string) {
     .from("project_tickets")
     .select("ticket_number, replace_by_date")
     .eq("is_continue_update", true)
-    .lte("replace_by_date", today)
+    .lte("replace_by_date", sevenDaysFromNow.toISOString().split('T')[0])
     .order("replace_by_date", { ascending: true });
 
   if (updateTicketsError) throw updateTicketsError;
-
-
 
   // Convert database tickets to BlueStakes ticket format for compatibility
   const updateTicketsFromDB = ticketsNeedingUpdateData || [];
@@ -226,14 +226,32 @@ export async function fetchAllTickets(bluestakesToken: string) {
 
   // Filter out ALL assigned tickets, previous tickets, and expired tickets
   const now = new Date();
+  console.log("Debug: Filtering unassigned tickets. Total tickets from BlueStakes:", allTickets.length);
+  console.log("Debug: Assigned ticket numbers count:", allAssignedTicketNumbers.size);
+  console.log("Debug: Previous ticket numbers count:", previousTicketNumbers.size);
+  
   const unassignedTickets = allTickets.filter(
-    (ticket) =>
-      !allAssignedTicketNumbers.has(ticket.ticket) &&
-      !previousTicketNumbers.has(ticket.ticket) &&
-      ticket.replace_by_date &&
-      new Date(ticket.replace_by_date) > now
+    (ticket) => {
+      const isAssigned = allAssignedTicketNumbers.has(ticket.ticket);
+      const isPrevious = previousTicketNumbers.has(ticket.ticket);
+      const hasReplaceDate = ticket.replace_by_date;
+      const isExpired = hasReplaceDate && new Date(ticket.replace_by_date) <= now;
+      
+      if (isAssigned || isPrevious || !hasReplaceDate || isExpired) {
+        console.log("Debug: Excluding ticket", ticket.ticket, {
+          isAssigned,
+          isPrevious,
+          hasReplaceDate,
+          isExpired,
+          replaceByDate: ticket.replace_by_date
+        });
+        return false;
+      }
+      return true;
+    }
   );
-
+  
+  console.log("Debug: Final unassigned tickets count:", unassignedTickets.length);
 
 
   // Process ticket updates
